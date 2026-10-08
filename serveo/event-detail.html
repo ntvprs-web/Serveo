@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Event details on SERVEO — location, organizer info, and how to help.">
+    <title>Event Details — SERVEO</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/event-detail.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+</head>
+
+<body>
+    <div class="ambient-bg"></div>
+    <div id="navbar-root"></div>
+
+    <div class="detail-page" id="detail-page">
+        <!-- Populated by JS -->
+    </div>
+
+    <div id="footer-root"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.getElementById('navbar-root').innerHTML = getNavbarHTML('events');
+        document.getElementById('footer-root').innerHTML = getFooterHTML();
+
+        const params = new URLSearchParams(window.location.search);
+        const eventId = parseInt(params.get('id'), 10);
+        const event = EVENTS_DATA.find(e => e.id === eventId) || EVENTS_DATA[0];
+        const cat = CATEGORIES[event.category];
+        const pct = Math.min(100, Math.round((event.volunteersJoined / event.volunteersNeeded) * 100));
+
+        document.title = `${event.title} — SERVEO`;
+
+        document.getElementById('detail-page').innerHTML = `
+      <div class="detail-hero" style="background: linear-gradient(180deg, ${cat.color}22, transparent 70%)">
+        <div class="container">
+          <a href="events.html" class="detail-back">← Back to Events</a>
+          <div class="detail-hero-top">
+            <span class="detail-icon" style="background:${cat.color}">${cat.icon}</span>
+            <div class="detail-badges">
+              ${urgencyBadgeHTML(event)}
+              ${verifiedBadgeHTML(event)}
+            </div>
+          </div>
+          <span class="detail-cat">${cat.label}</span>
+          <h1>${event.title}</h1>
+          <p class="detail-org-line">Organized by <strong>${event.organizer}</strong></p>
+        </div>
+      </div>
+
+      <div class="container detail-body">
+        <div class="detail-main">
+          <div class="glass-card detail-section">
+            <h3>About this event</h3>
+            <p>${event.description}</p>
+          </div>
+
+          <div class="glass-card detail-section">
+            <h3>Location</h3>
+            <p class="detail-address">📍 ${event.address}</p>
+            <div class="detail-map-wrap">
+              <div id="detail-map"></div>
+            </div>
+          </div>
+
+          <div class="glass-card detail-section">
+            <h3>Organizer</h3>
+            <div class="detail-organizer-row">
+              <div class="detail-org-avatar">🏥</div>
+              <div>
+                <p class="detail-org-name">${event.organizer} ${event.verified ? '<span class="mini-verified">✓ Verified</span>' : ''}</p>
+                <p class="detail-org-sub">Trusted organizer on SERVEO</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="detail-sidebar">
+          <div class="glass-card detail-action-card">
+            <div class="detail-meta-list">
+              <div class="detail-meta-row"><span>📅 Date</span><strong>${formatEventDate(event.date)}</strong></div>
+              <div class="detail-meta-row"><span>🕐 Time</span><strong>${formatEventTime(event)}</strong></div>
+              <div class="detail-meta-row"><span>📍 City</span><strong>${event.city}</strong></div>
+            </div>
+
+            ${volunteerProgressHTML(event)}
+            <p class="detail-pct">${pct}% of volunteer goal reached</p>
+
+            <div class="detail-actions">
+              <button class="btn btn-primary btn-lg" id="rsvp-btn">🙋 Volunteer for this Event</button>
+              ${event.donationLink ? `<button class="btn btn-secondary btn-lg" id="donate-btn">💛 Donate to Support</button>` : ''}
+              <a href="${getDirectionsURL(event.lat, event.lng)}" target="_blank" class="btn btn-outline btn-lg">🧭 Get Directions</a>
+            </div>
+
+            <button class="detail-share" id="share-btn">🔗 Share this event</button>
+          </div>
+        </aside>
+      </div>
+    `;
+
+        setTimeout(() => {
+            const map = L.map('detail-map', { zoomControl: true, attributionControl: false })
+                .setView([event.lat, event.lng], 14);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+            const icon = L.divIcon({
+                className: 'custom-marker-wrap',
+                html: `<div class="custom-marker" style="background:${cat.color}"><span>${cat.icon}</span></div>`,
+                iconSize: [34, 34], iconAnchor: [17, 17]
+            });
+            L.marker([event.lat, event.lng], { icon }).addTo(map);
+        }, 100);
+
+        document.getElementById('rsvp-btn').addEventListener('click', () => {
+            showToast('🎉 You\'re registered! The organizer will be in touch.');
+        });
+
+        document.getElementById('donate-btn')?.addEventListener('click', () => {
+            showToast('💛 Redirecting to a secure UPI payment...', 'info');
+        });
+
+        document.getElementById('share-btn').addEventListener('click', () => {
+            showToast('🔗 Link copied to clipboard!', 'info');
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="About SERVEO — our mission, SDG alignment, tech stack, and development roadmap.">
+    <title>About — SERVEO</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/about.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+</head>
+
+<body>
+    <div class="ambient-bg"></div>
+    <div id="navbar-root"></div>
+
+    <div class="about-page">
+        <div class="container">
+            <!-- Header -->
+            <div class="about-header">
+                <h1>About <span class="gradient-text">SERVEO</span></h1>
+                <p class="subtitle">A crowdsourced, location-based platform designed to centralize and map nearby
+                    public-service and community welfare initiatives in real time — bridging the gap between willing
+                    citizens and the grassroots initiatives that need participation.</p>
+            </div>
+
+            <!-- Mission -->
+            <div class="mission-section">
+                <div class="mission-visual">
+                    <div class="visual-box">🤝</div>
+                </div>
+                <div class="mission-text">
+                    <h2>Our <span class="gradient-text">Mission</span></h2>
+                    <p>Every day, thousands of public welfare initiatives take place across communities, yet most suffer
+                        from severely diminished turnout due to fragmented communication channels.</p>
+                    <p>SERVEO exists to solve this <strong>visibility crisis</strong>. We believe that the gap between
+                        "wanting to help" and "actually helping" is primarily a <em>discovery problem</em> — and we're
+                        building the technology to close it.</p>
+                    <p>By combining interactive map discovery, real-time geolocation, verified organizer portals, and
+                        urgency indicators, SERVEO transforms how communities connect with the initiatives that need
+                        them most.</p>
+                </div>
+            </div>
+
+            <!-- SDG Alignment -->
+            <div class="sdg-section">
+                <div class="section-header">
+                    <h2>🌐 UN Sustainable Development <span class="gradient-text">Goals</span></h2>
+                    <p>SERVEO maps directly to four core UN SDGs.</p>
+                </div>
+                <div class="sdg-grid">
+                    <div class="sdg-card glass-card">
+                        <div class="sdg-number" style="background: #4c9f38">3</div>
+                        <h3>Good Health & Well-Being</h3>
+                        <p>Connects voluntary blood donors with regional blood banks and provides geolocation visibility
+                            for free healthcare screenings and medical camps.</p>
+                    </div>
+                    <div class="sdg-card glass-card">
+                        <div class="sdg-number" style="background: #fd9d24">11</div>
+                        <h3>Sustainable Cities & Communities</h3>
+                        <p>Empowers grassroots disaster relief coordination and strengthens community resilience by
+                            centralizing localized mutual-aid efforts.</p>
+                    </div>
+                    <div class="sdg-card glass-card">
+                        <div class="sdg-number" style="background: #00689d">16</div>
+                        <h3>Peace, Justice & Strong Institutions</h3>
+                        <p>Eliminates donation fraud and disinformation by introducing institutional verification and
+                            public impact transparency.</p>
+                    </div>
+                    <div class="sdg-card glass-card">
+                        <div class="sdg-number" style="background: #19486a">17</div>
+                        <h3>Partnerships for the Goals</h3>
+                        <p>Establishes a shared digital medium where NGOs, hospitals, businesses, academic institutions,
+                            and citizens collaborate toward common welfare targets.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Competitive Comparison -->
+            <div class="comparison-section">
+                <div class="section-header">
+                    <h2>📊 How SERVEO <span class="gradient-text">Compares</span></h2>
+                    <p>Purpose-built for public service — not adapted from commercial platforms.</p>
+                </div>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Dimension</th>
+                            <th>SERVEO</th>
+                            <th>WhatsApp Groups</th>
+                            <th>Facebook Events</th>
+                            <th>Meetup</th>
+                            <th>Google Maps</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Domain Focus</td>
+                            <td><span class="check">★</span> Public Service Only</td>
+                            <td>Fragmented Chats</td>
+                            <td>General / Commercial</td>
+                            <td>Hobbies / Commercial</td>
+                            <td>Business POIs</td>
+                        </tr>
+                        <tr>
+                            <td>Discovery</td>
+                            <td><span class="check">★</span> Interactive Map</td>
+                            <td>Private Link Only</td>
+                            <td>Algorithm Feed</td>
+                            <td>City Lists</td>
+                            <td>Search-Based</td>
+                        </tr>
+                        <tr>
+                            <td>Access Friction</td>
+                            <td><span class="check">★</span> Zero Login</td>
+                            <td><span class="cross">✕</span> Group Access</td>
+                            <td><span class="cross">✕</span> Account Required</td>
+                            <td><span class="cross">✕</span> Account Required</td>
+                            <td>Low</td>
+                        </tr>
+                        <tr>
+                            <td>Trust Verification</td>
+                            <td><span class="check">★</span> Institutional Badges</td>
+                            <td><span class="cross">✕</span> None</td>
+                            <td>Self-Serve</td>
+                            <td>Self-Serve</td>
+                            <td>Google Profiles</td>
+                        </tr>
+                        <tr>
+                            <td>Urgency Awareness</td>
+                            <td><span class="check">★</span> Real-Time Badges</td>
+                            <td>Fleeting Feeds</td>
+                            <td>Static Dates</td>
+                            <td>Static Dates</td>
+                            <td>Hours Only</td>
+                        </tr>
+                        <tr>
+                            <td>Donation Integration</td>
+                            <td><span class="check">★</span> Direct UPI/Links</td>
+                            <td><span class="cross">✕</span> Manual</td>
+                            <td><span class="cross">✕</span> None</td>
+                            <td><span class="cross">✕</span> None</td>
+                            <td><span class="cross">✕</span> None</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tech Stack -->
+            <div class="tech-section">
+                <div class="section-header">
+                    <h2>⚙️ Technology <span class="gradient-text">Stack</span></h2>
+                    <p>Zero-cost, high-performance architecture optimized for low-bandwidth networks.</p>
+                </div>
+                <div class="tech-grid">
+                    <div class="tech-item">
+                        <div class="tech-icon">📄</div>
+                        <h4>HTML5 / CSS3</h4>
+                        <p>Semantic, responsive, accessible</p>
+                    </div>
+                    <div class="tech-item">
+                        <div class="tech-icon">⚡</div>
+                        <h4>Vanilla JavaScript</h4>
+                        <p>Zero-framework, ES6+ modules</p>
+                    </div>
+                    <div class="tech-item">
+                        <div class="tech-icon">🗺️</div>
+                        <h4>Leaflet.js</h4>
+                        <p>Open-source mapping engine</p>
+                    </div>
+                    <div class="tech-item">
+                        <div class="tech-icon">🌍</div>
+                        <h4>OpenStreetMap</h4>
+                        <p>Free tile server, no API billing</p>
+                    </div>
+                    <div class="tech-item">
+                        <div class="tech-icon">📍</div>
+                        <h4>Geolocation API</h4>
+                        <p>Browser-native GPS access</p>
+                    </div>
+                    <div class="tech-item">
+                        <div class="tech-icon">📱</div>
+                        <h4>PWA</h4>
+                        <p>Installable, offline-capable</p>
+                    </div>
+                    <div class="tech-item">
+                        <div class="tech-icon">🔥</div>
+                        <h4>Firebase</h4>
+                        <p>Auth, Firestore, hosting</p>
+                    </div>
+                    <div class="tech-item">
+                        <div class="tech-icon">🐍</div>
+                        <h4>FastAPI / Supabase</h4>
+                        <p>Backend API (Phase 2)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Roadmap -->
+            <div class="roadmap-section">
+                <div class="section-header">
+                    <h2>🗓️ Development <span class="gradient-text">Roadmap</span></h2>
+                    <p>A phased approach from MVP to scaled municipal deployment.</p>
+                </div>
+                <div class="roadmap-timeline">
+                    <div class="roadmap-item glass-card completed">
+                        <div class="phase-label">Phase 0 — Complete</div>
+                        <h3>Architecture Setup & Foundation</h3>
+                        <p>Repository setup, design system, component library, asset pipelines, and PWA scaffolding.</p>
+                    </div>
+                    <div class="roadmap-item glass-card current">
+                        <div class="phase-label">Phase 1 — In Progress</div>
+                        <h3>Core Interface & Map Engine</h3>
+                        <p>Leaflet.js deployment with OpenStreetMap, browser geolocation "Near Me" centering, and 18
+                            seeded regional events.</p>
+                    </div>
+                    <div class="roadmap-item glass-card">
+                        <div class="phase-label">Phase 2 — Upcoming</div>
+                        <h3>Backend, Database & Event Submissions</h3>
+                        <p>Firebase/Supabase integration, authenticated "Post an Event" workflow, dynamic database
+                            queries, and live map-marker population.</p>
+                    </div>
+                    <div class="roadmap-item glass-card">
+                        <div class="phase-label">Phase 3 — Planned</div>
+                        <h3>Event Discovery, UX & Engagement</h3>
+                        <p>Haversine distance sorting, dynamic category filters, urgency tags, event detail popups,
+                            native directions, and social sharing.</p>
+                    </div>
+                    <div class="roadmap-item glass-card">
+                        <div class="phase-label">Phase 4 — Future</div>
+                        <h3>PWA Transformation & Scalability</h3>
+                        <p>Service worker offline persistence, FCM push notifications, pilot launch in target city, and
+                            performance optimization.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team -->
+            <div class="team-section">
+                <div class="section-header">
+                    <h2>👥 The <span class="gradient-text">Team</span></h2>
+                    <p>Built with passion by students who believe technology can bridge the service gap.</p>
+                </div>
+                <div class="team-grid">
+                    <div class="team-card glass-card">
+                        <div class="team-avatar">👨‍💻</div>
+                        <h4>Nivesh</h4>
+                        <span class="team-role">Lead Developer</span>
+                    </div>
+                    <div class="team-card glass-card">
+                        <div class="team-avatar">🎨</div>
+                        <h4>Team Member</h4>
+                        <span class="team-role">UI/UX Designer</span>
+                    </div>
+                    <div class="team-card glass-card">
+                        <div class="team-avatar">📊</div>
+                        <h4>Team Member</h4>
+                        <span class="team-role">Research & Data</span>
+                    </div>
+                    <div class="team-card glass-card">
+                        <div class="team-avatar">📢</div>
+                        <h4>Team Member</h4>
+                        <span class="team-role">Outreach & Impact</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="footer-root"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.getElementById('navbar-root').innerHTML = getNavbarHTML('about');
+        document.getElementById('footer-root').innerHTML = getFooterHTML();
+    </script>
+</body>
+
+</html>

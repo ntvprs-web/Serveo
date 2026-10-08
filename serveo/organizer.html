@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Organizer dashboard — manage your events on SERVEO.">
+    <title>Organizer Dashboard — SERVEO</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/organizer.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+</head>
+
+<body>
+    <div class="ambient-bg"></div>
+    <div id="navbar-root"></div>
+
+    <div class="organizer-page">
+        <!-- Header -->
+        <div class="organizer-header">
+            <div class="container">
+                <div class="org-profile">
+                    <div class="org-avatar">🏥</div>
+                    <div class="org-info">
+                        <h1>Indian Red Cross Society</h1>
+                        <p>Verified NGO · Managing 12 Active Events · Member since Jan 2026</p>
+                        <span class="badge badge-verified" style="margin-top: 8px">✓ Verified Organization</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Dashboard Stats -->
+            <div class="dash-stats">
+                <div class="dash-stat glass-card">
+                    <div class="dash-stat-number">12</div>
+                    <div class="dash-stat-label">Active Events</div>
+                </div>
+                <div class="dash-stat glass-card">
+                    <div class="dash-stat-number">847</div>
+                    <div class="dash-stat-label">Total Volunteers</div>
+                </div>
+                <div class="dash-stat glass-card">
+                    <div class="dash-stat-number">4,200</div>
+                    <div class="dash-stat-label">Blood Units</div>
+                </div>
+                <div class="dash-stat glass-card">
+                    <div class="dash-stat-number">96%</div>
+                    <div class="dash-stat-label">Trust Score</div>
+                </div>
+            </div>
+
+            <!-- Event Management -->
+            <div class="dash-section">
+                <div class="dash-section-header">
+                    <h2>📋 Your Events</h2>
+                    <a href="post-event.html" class="btn btn-primary btn-sm">+ New Event</a>
+                </div>
+
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th>Event</th>
+                            <th>Date</th>
+                            <th>City</th>
+                            <th>Volunteers</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="table-title">Emergency Blood Donation Camp</td>
+                            <td>Aug 21, 2026</td>
+                            <td>New Delhi</td>
+                            <td>87 / 200</td>
+                            <td><span class="table-status status-live">🟢 Live</span></td>
+                            <td class="table-actions">
+                                <a href="event-detail.html?id=1" class="btn btn-secondary btn-sm">View</a>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Free Medical Health Screening</td>
+                            <td>Aug 22, 2026</td>
+                            <td>New Delhi</td>
+                            <td>32 / 50</td>
+                            <td><span class="table-status status-upcoming">🔵 Upcoming</span></td>
+                            <td class="table-actions">
+                                <a href="event-detail.html?id=2" class="btn btn-secondary btn-sm">View</a>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Clothes & Blanket Collection</td>
+                            <td>Aug 21, 2026</td>
+                            <td>New Delhi</td>
+                            <td>28 / 40</td>
+                            <td><span class="table-status status-live">🟢 Live</span></td>
+                            <td class="table-actions">
+                                <a href="event-detail.html?id=14" class="btn btn-secondary btn-sm">View</a>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Earthquake Preparedness Workshop</td>
+                            <td>Aug 25, 2026</td>
+                            <td>New Delhi</td>
+                            <td>12 / 30</td>
+                            <td><span class="table-status status-upcoming">🔵 Upcoming</span></td>
+                            <td class="table-actions">
+                                <a href="event-detail.html?id=9" class="btn btn-secondary btn-sm">View</a>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Summer Blood Drive 2026</td>
+                            <td>Jul 15, 2026</td>
+                            <td>Mumbai</td>
+                            <td>200 / 200</td>
+                            <td><span class="table-status status-ended">⚫ Ended</span></td>
+                            <td class="table-actions">
+                                <button class="btn btn-secondary btn-sm">Report</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Independence Day Clean-Up</td>
+                            <td>Aug 15, 2026</td>
+                            <td>New Delhi</td>
+                            <td>150 / 150</td>
+                            <td><span class="table-status status-ended">⚫ Ended</span></td>
+                            <td class="table-actions">
+                                <button class="btn btn-secondary btn-sm">Report</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="dash-section" style="display:flex; gap: var(--space-lg); flex-wrap: wrap;">
+                <div class="glass-card" style="flex:1; min-width:280px; padding: var(--space-xl); cursor:default;">
+                    <h3 style="margin-bottom: var(--space-md);">📊 Analytics (Coming Soon)</h3>
+                    <p>Advanced RSVP analytics, volunteer demographics, and impact reports will be available in Phase 3.
+                    </p>
+                    <button class="btn btn-secondary btn-sm" style="margin-top: var(--space-md);" disabled>Coming
+                        Soon</button>
+                </div>
+                <div class="glass-card" style="flex:1; min-width:280px; padding: var(--space-xl); cursor:default;">
+                    <h3 style="margin-bottom: var(--space-md);">👥 Multi-Admin (Coming Soon)</h3>
+                    <p>Invite team members, assign roles, and manage events collaboratively.</p>
+                    <button class="btn btn-secondary btn-sm" style="margin-top: var(--space-md);" disabled>Coming
+                        Soon</button>
+                </div>
+                <div class="glass-card" style="flex:1; min-width:280px; padding: var(--space-xl); cursor:default;">
+                    <h3 style="margin-bottom: var(--space-md);">🔔 Notifications (Coming Soon)</h3>
+                    <p>Push notifications to volunteers within your event radius when you post urgently.</p>
+                    <button class="btn btn-secondary btn-sm" style="margin-top: var(--space-md);" disabled>Coming
+                        Soon</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="footer-root"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.getElementById('navbar-root').innerHTML = getNavbarHTML('');
+        document.getElementById('footer-root').innerHTML = getFooterHTML();
+    </script>
+</body>
+
+</html>

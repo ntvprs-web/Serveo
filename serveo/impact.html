@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SERVEO Impact Dashboard — Real-time metrics on community welfare across India.">
+    <title>Impact Dashboard — SERVEO</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/impact.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+</head>
+
+<body>
+    <div class="ambient-bg"></div>
+    <div id="navbar-root"></div>
+
+    <div class="impact-page">
+        <div class="impact-header">
+            <div class="container">
+                <h1>Impact <span class="gradient-text">Dashboard</span></h1>
+                <p>Real-time, anonymized metrics showcasing the collective impact of SERVEO communities across India.
+                </p>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Big Stats -->
+            <div class="impact-stats-grid">
+                <div class="impact-stat-card glass-card animate-on-scroll">
+                    <div class="impact-stat-icon">🎯</div>
+                    <div class="impact-stat-number" data-count="1247">0</div>
+                    <div class="impact-stat-label">Total Events Facilitated</div>
+                </div>
+                <div class="impact-stat-card glass-card animate-on-scroll">
+                    <div class="impact-stat-icon">👥</div>
+                    <div class="impact-stat-number" data-count="28450">0</div>
+                    <div class="impact-stat-label">Volunteers Mobilized</div>
+                </div>
+                <div class="impact-stat-card glass-card animate-on-scroll">
+                    <div class="impact-stat-icon">💉</div>
+                    <div class="impact-stat-number" data-count="18200">0</div>
+                    <div class="impact-stat-label">Blood Units Collected</div>
+                </div>
+                <div class="impact-stat-card glass-card animate-on-scroll">
+                    <div class="impact-stat-icon">🏙️</div>
+                    <div class="impact-stat-number" data-count="42">0</div>
+                    <div class="impact-stat-label">Cities Active</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-grid">
+                <!-- Category Distribution -->
+                <div class="chart-card glass-card">
+                    <h3>📊 Events by Category</h3>
+                    <div class="bar-chart" id="category-bars">
+                        <div class="bar-row">
+                            <span class="bar-label">💉 Blood</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--cat-blood)" data-width="78%">312
+                                    events</div>
+                            </div>
+                        </div>
+                        <div class="bar-row">
+                            <span class="bar-label">🏥 Medical</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--cat-medical)" data-width="55%">
+                                    219 events</div>
+                            </div>
+                        </div>
+                        <div class="bar-row">
+                            <span class="bar-label">🍱 Food</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--cat-food)" data-width="67%">268
+                                    events</div>
+                            </div>
+                        </div>
+                        <div class="bar-row">
+                            <span class="bar-label">🆘 Disaster</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--cat-disaster)" data-width="42%">
+                                    167 events</div>
+                            </div>
+                        </div>
+                        <div class="bar-row">
+                            <span class="bar-label">🐾 Animal</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--cat-animal)" data-width="30%">
+                                    120 events</div>
+                            </div>
+                        </div>
+                        <div class="bar-row">
+                            <span class="bar-label">🌱 Environment</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--cat-environment)"
+                                    data-width="38%">98 events</div>
+                            </div>
+                        </div>
+                        <div class="bar-row">
+                            <span class="bar-label">📚 Education</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--cat-education)"
+                                    data-width="25%">63 events</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Donut Chart -->
+                <div class="chart-card glass-card">
+                    <h3>🥧 Volunteer Distribution</h3>
+                    <div class="donut-container">
+                        <div class="donut-chart" style="background: conic-gradient(
+              var(--cat-blood) 0% 25%,
+              var(--cat-food) 25% 43%,
+              var(--cat-medical) 43% 58%,
+              var(--cat-disaster) 58% 72%,
+              var(--cat-environment) 72% 82%,
+              var(--cat-animal) 82% 90%,
+              var(--cat-education) 90% 100%
+            );">
+                            <div class="donut-center"
+                                style="width:100px;height:100px;border-radius:50%;background:var(--bg-card);">
+                                <div class="donut-total">28.4K</div>
+                                <div class="donut-label">Total</div>
+                            </div>
+                        </div>
+                        <div class="donut-legend">
+                            <div class="legend-item"><span class="legend-dot"
+                                    style="background:var(--cat-blood)"></span> Blood Drives <span
+                                    class="legend-value">25%</span></div>
+                            <div class="legend-item"><span class="legend-dot" style="background:var(--cat-food)"></span>
+                                Food Distribution <span class="legend-value">18%</span></div>
+                            <div class="legend-item"><span class="legend-dot"
+                                    style="background:var(--cat-medical)"></span> Medical Camps <span
+                                    class="legend-value">15%</span></div>
+                            <div class="legend-item"><span class="legend-dot"
+                                    style="background:var(--cat-disaster)"></span> Disaster Relief <span
+                                    class="legend-value">14%</span></div>
+                            <div class="legend-item"><span class="legend-dot"
+                                    style="background:var(--cat-environment)"></span> Environment <span
+                                    class="legend-value">10%</span></div>
+                            <div class="legend-item"><span class="legend-dot"
+                                    style="background:var(--cat-animal)"></span> Animal Rescue <span
+                                    class="legend-value">8%</span></div>
+                            <div class="legend-item"><span class="legend-dot"
+                                    style="background:var(--cat-education)"></span> Education <span
+                                    class="legend-value">10%</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Secondary Stats -->
+                <div class="chart-card glass-card">
+                    <h3>🍱 Key Milestones</h3>
+                    <div class="bar-chart">
+                        <div class="bar-row">
+                            <span class="bar-label">Meals Served</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--accent-gradient)"
+                                    data-width="85%">3,40,000</div>
+                            </div>
+                        </div>
+                        <div class="bar-row">
+                            <span class="bar-label">Trees Planted</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--accent-gradient-cool)"
+                                    data-width="52%">52,000</div>
+                            </div>
+                        </div>
+                        <div class="bar-row">
+                            <span class="bar-label">Animals Rescued</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--cat-animal)" data-width="35%">
+                                    4,800</div>
+                            </div>
+                        </div>
+                        <div class="bar-row">
+                            <span class="bar-label">Free Checkups</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width:0; background: var(--cat-medical)" data-width="60%">
+                                    28,500</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="chart-card glass-card">
+                    <h3>⚡ Live Activity Feed</h3>
+                    <div class="activity-list">
+                        <div class="activity-item">
+                            <div class="activity-icon" style="background:rgba(239,68,68,0.15)">💉</div>
+                            <div class="activity-content">
+                                <strong>Emergency Blood Donation Camp</strong>
+                                <p>87 donors have joined in New Delhi</p>
+                            </div>
+                            <span class="activity-time">2 min ago</span>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon" style="background:rgba(245,158,11,0.15)">🍱</div>
+                            <div class="activity-content">
+                                <strong>10,000 Meals Challenge</strong>
+                                <p>Crossed 75% target in Pune!</p>
+                            </div>
+                            <span class="activity-time">8 min ago</span>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon" style="background:rgba(16,185,129,0.15)">🌱</div>
+                            <div class="activity-content">
+                                <strong>New Event Published</strong>
+                                <p>Tree Plantation Drive — Delhi Greens Trust</p>
+                            </div>
+                            <span class="activity-time">15 min ago</span>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon" style="background:rgba(6,182,212,0.15)">🏥</div>
+                            <div class="activity-content">
+                                <strong>Free Eye Surgery Camp</strong>
+                                <p>42 surgeries completed in Madurai</p>
+                            </div>
+                            <span class="activity-time">22 min ago</span>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon" style="background:rgba(139,92,246,0.15)">🐾</div>
+                            <div class="activity-content">
+                                <strong>Vaccination Camp Chennai</strong>
+                                <p>120 street dogs vaccinated so far</p>
+                            </div>
+                            <span class="activity-time">35 min ago</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- City Coverage -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>🏙️ City <span class="gradient-text">Coverage</span></h2>
+                    <p>SERVEO is active across 42 cities and growing.</p>
+                </div>
+                <div class="city-grid">
+                    <div class="city-card"><span class="city-name">New Delhi</span>
+                        <div class="city-count">187 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Mumbai</span>
+                        <div class="city-count">156 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Bengaluru</span>
+                        <div class="city-count">134 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Chennai</span>
+                        <div class="city-count">98 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Hyderabad</span>
+                        <div class="city-count">89 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Pune</span>
+                        <div class="city-count">76 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Kolkata</span>
+                        <div class="city-count">67 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Jaipur</span>
+                        <div class="city-count">52 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Patna</span>
+                        <div class="city-count">48 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Bhopal</span>
+                        <div class="city-count">41 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Lucknow</span>
+                        <div class="city-count">38 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Ahmedabad</span>
+                        <div class="city-count">35 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Dehradun</span>
+                        <div class="city-count">28 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Madurai</span>
+                        <div class="city-count">24 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Chandigarh</span>
+                        <div class="city-count">22 events</div>
+                    </div>
+                    <div class="city-card"><span class="city-name">Kochi</span>
+                        <div class="city-count">19 events</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="footer-root"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.getElementById('navbar-root').innerHTML = getNavbarHTML('impact');
+        document.getElementById('footer-root').innerHTML = getFooterHTML();
+
+        // Animate bar charts on scroll
+        const barObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.querySelectorAll('.bar-fill').forEach(bar => {
+                        bar.style.width = bar.dataset.width;
+                    });
+                    barObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.3 });
+
+        document.querySelectorAll('.bar-chart').forEach(chart => {
+            barObserver.observe(chart);
+        });
+    </script>
+</body>
+
+</html>

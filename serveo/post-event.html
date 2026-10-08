@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Post a community welfare event on SERVEO — reach thousands of volunteers near you.">
+    <title>Post an Event — SERVEO</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/post-event.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+</head>
+
+<body>
+    <div class="ambient-bg"></div>
+    <div id="navbar-root"></div>
+
+    <div class="form-page">
+        <div class="form-header">
+            <div class="container">
+                <h1>Post an <span class="gradient-text">Event</span></h1>
+                <p>Publish your community welfare initiative and reach thousands of local volunteers instantly.</p>
+            </div>
+        </div>
+
+        <div class="container form-container">
+            <!-- Success Message -->
+            <div class="form-success glass-card" id="form-success">
+                <div class="success-icon">🎉</div>
+                <h2>Event Submitted Successfully!</h2>
+                <p>Your event is being reviewed by our team and will appear on the map within 24 hours. You'll receive
+                    confirmation at the provided email address.</p>
+                <br>
+                <a href="events.html" class="btn btn-primary">Browse Events</a>
+            </div>
+
+            <!-- Form -->
+            <form class="form-card glass-card" id="event-form">
+                <!-- Category -->
+                <div class="form-section">
+                    <h3 class="form-section-title">📂 Event Category</h3>
+                    <div class="category-grid" id="category-grid">
+                        <label class="category-option" data-cat="blood">
+                            <input type="radio" name="category" value="blood">
+                            <div class="cat-icon">💉</div>
+                            <div class="cat-label">Blood Drive</div>
+                        </label>
+                        <label class="category-option" data-cat="medical">
+                            <input type="radio" name="category" value="medical">
+                            <div class="cat-icon">🏥</div>
+                            <div class="cat-label">Medical Camp</div>
+                        </label>
+                        <label class="category-option" data-cat="food">
+                            <input type="radio" name="category" value="food">
+                            <div class="cat-icon">🍱</div>
+                            <div class="cat-label">Food Distribution</div>
+                        </label>
+                        <label class="category-option" data-cat="disaster">
+                            <input type="radio" name="category" value="disaster">
+                            <div class="cat-icon">🆘</div>
+                            <div class="cat-label">Disaster Relief</div>
+                        </label>
+                        <label class="category-option" data-cat="animal">
+                            <input type="radio" name="category" value="animal">
+                            <div class="cat-icon">🐾</div>
+                            <div class="cat-label">Animal Rescue</div>
+                        </label>
+                        <label class="category-option" data-cat="environment">
+                            <input type="radio" name="category" value="environment">
+                            <div class="cat-icon">🌱</div>
+                            <div class="cat-label">Environment</div>
+                        </label>
+                        <label class="category-option" data-cat="education">
+                            <input type="radio" name="category" value="education">
+                            <div class="cat-icon">📚</div>
+                            <div class="cat-label">Education</div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Basic Info -->
+                <div class="form-section">
+                    <h3 class="form-section-title">📝 Event Details</h3>
+                    <div class="form-group">
+                        <label for="event-title">Event Title *</label>
+                        <input type="text" class="form-control" id="event-title"
+                            placeholder="e.g., Emergency Blood Donation Camp" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="event-desc">Description *</label>
+                        <textarea class="form-control" id="event-desc"
+                            placeholder="Describe the event, what volunteers should expect, requirements, etc."
+                            required></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-date">Date *</label>
+                            <input type="date" class="form-control" id="event-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="volunteers-needed">Volunteers Needed</label>
+                            <input type="number" class="form-control" id="volunteers-needed" placeholder="e.g., 50"
+                                min="1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="start-time">Start Time *</label>
+                            <input type="time" class="form-control" id="start-time" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="end-time">End Time *</label>
+                            <input type="time" class="form-control" id="end-time" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location -->
+                <div class="form-section">
+                    <h3 class="form-section-title">📍 Location</h3>
+                    <div class="form-group">
+                        <label for="event-address">Full Address *</label>
+                        <input type="text" class="form-control" id="event-address"
+                            placeholder="e.g., Red Cross Bhawan, Parliament Street, New Delhi" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-city">City *</label>
+                            <input type="text" class="form-control" id="event-city" placeholder="e.g., New Delhi"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label>Pin Location on Map</label>
+                            <p class="form-help">Click on the map to set the exact event location.</p>
+                        </div>
+                    </div>
+                    <div class="map-picker">
+                        <div id="picker-map"></div>
+                    </div>
+                    <div class="form-row" style="margin-top: var(--space-md)">
+                        <div class="form-group">
+                            <label for="event-lat">Latitude</label>
+                            <input type="text" class="form-control" id="event-lat" placeholder="Auto-detected" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="event-lng">Longitude</label>
+                            <input type="text" class="form-control" id="event-lng" placeholder="Auto-detected" readonly>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Organizer -->
+                <div class="form-section">
+                    <h3 class="form-section-title">🏢 Organizer Information</h3>
+                    <div class="form-group">
+                        <label for="org-name">Organization / Organizer Name *</label>
+                        <input type="text" class="form-control" id="org-name"
+                            placeholder="e.g., Indian Red Cross Society" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="org-type">Organization Type</label>
+                            <select class="form-control" id="org-type">
+                                <option value="">Select type</option>
+                                <option value="NGO">NGO</option>
+                                <option value="Hospital">Hospital</option>
+                                <option value="Government">Government Body</option>
+                                <option value="Club">Club / Student Body</option>
+                                <option value="Community Group">Community Group</option>
+                                <option value="Individual">Individual</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="org-contact">Contact Number *</label>
+                            <input type="tel" class="form-control" id="org-contact" placeholder="+91 98765 43210"
+                                required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="org-email">Email Address *</label>
+                        <input type="email" class="form-control" id="org-email" placeholder="contact@organization.org"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label for="donation-link">Donation / UPI Link (Optional)</label>
+                        <input type="text" class="form-control" id="donation-link"
+                            placeholder="e.g., upi://pay?pa=org@sbi">
+                        <p class="form-help">Add a verified UPI or payment link for supporters to donate directly.</p>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div class="form-checkbox">
+                    <input type="checkbox" id="terms" required>
+                    <label for="terms">I confirm that this is a genuine, non-commercial public welfare event. I
+                        understand that fraudulent submissions will be reported and blocked.</label>
+                </div>
+
+                <div class="form-submit">
+                    <button type="submit" class="btn btn-primary btn-lg">📢 Submit Event for Review</button>
+                    <span class="form-help">Events are reviewed within 24 hours.</span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="footer-root"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.getElementById('navbar-root').innerHTML = getNavbarHTML('');
+        document.getElementById('footer-root').innerHTML = getFooterHTML();
+
+        // Category selection
+        document.querySelectorAll('.category-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                document.querySelectorAll('.category-option').forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+            });
+        });
+
+        // Map picker
+        setTimeout(() => {
+            const pickerMap = L.map('picker-map').setView([22.5, 79], 5);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(pickerMap);
+
+            let pickerMarker = null;
+
+            pickerMap.on('click', (e) => {
+                const { lat, lng } = e.latlng;
+                document.getElementById('event-lat').value = lat.toFixed(6);
+                document.getElementById('event-lng').value = lng.toFixed(6);
+
+                if (pickerMarker) {
+                    pickerMarker.setLatLng(e.latlng);
+                } else {
+                    pickerMarker = L.marker(e.latlng).addTo(pickerMap);
+                }
+            });
+        }, 200);
+
+        // Form Submit
+        document.getElementById('event-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            document.getElementById('event-form').style.display = 'none';
+            document.getElementById('form-success').classList.add('show');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            showToast('🎉 Event submitted successfully!');
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,287 @@
+.about-page {
+  padding-bottom: var(--space-2xl);
+}
+.about-header {
+  padding: var(--space-xl) 0 var(--space-2xl);
+  max-width: 780px;
+}
+.about-header h1 {
+  margin-bottom: var(--space-sm);
+}
+.about-header .subtitle {
+  font-size: 1.08rem;
+}
+
+/* ============================================
+   MISSION
+   ============================================ */
+.mission-section {
+  display: grid;
+  grid-template-columns: 0.7fr 1.3fr;
+  gap: var(--space-2xl);
+  align-items: center;
+  margin-bottom: var(--space-3xl);
+}
+.mission-visual {
+  display: flex;
+  justify-content: center;
+}
+.visual-box {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(0, 212, 170, 0.25), rgba(139, 92, 246, 0.12) 60%, transparent 80%);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  position: relative;
+}
+.visual-box::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+}
+.mission-text h2 {
+  margin-bottom: var(--space-md);
+}
+.mission-text p {
+  margin-bottom: var(--space-sm);
+  font-size: 0.98rem;
+}
+
+/* ============================================
+   SDG GRID
+   ============================================ */
+.sdg-section {
+  margin-bottom: var(--space-3xl);
+}
+.sdg-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+.sdg-card {
+  padding: var(--space-lg);
+}
+.sdg-number {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #fff;
+  margin-bottom: var(--space-md);
+}
+.sdg-card h3 {
+  margin-bottom: 6px;
+}
+.sdg-card p {
+  font-size: 0.88rem;
+}
+
+/* ============================================
+   COMPARISON TABLE
+   ============================================ */
+.comparison-section {
+  margin-bottom: var(--space-3xl);
+}
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  font-size: 0.86rem;
+}
+.comparison-table th, .comparison-table td {
+  padding: 0.9rem var(--space-md);
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+.comparison-table thead th {
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+}
+.comparison-table thead th:nth-child(2) {
+  color: var(--accent-primary);
+}
+.comparison-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.comparison-table tbody td:first-child {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.comparison-table tbody td:nth-child(2) {
+  background: rgba(0, 212, 170, 0.05);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.comparison-table .check {
+  color: var(--accent-primary);
+  margin-right: 4px;
+}
+.comparison-table .cross {
+  color: var(--danger);
+  opacity: 0.8;
+  margin-right: 4px;
+}
+.comparison-table td, .comparison-table th {
+  color: var(--text-secondary);
+}
+
+/* ============================================
+   TECH STACK
+   ============================================ */
+.tech-section {
+  margin-bottom: var(--space-3xl);
+}
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+.tech-item {
+  padding: var(--space-lg);
+  text-align: center;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.tech-item:hover {
+  border-color: var(--border-color-strong);
+  transform: translateY(-3px);
+}
+.tech-icon {
+  font-size: 1.6rem;
+  margin-bottom: var(--space-sm);
+}
+.tech-item h4 {
+  margin-bottom: 3px;
+  font-size: 0.9rem;
+}
+.tech-item p {
+  font-size: 0.78rem;
+}
+
+/* ============================================
+   ROADMAP
+   ============================================ */
+.roadmap-section {
+  margin-bottom: var(--space-3xl);
+}
+.roadmap-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.roadmap-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-lg);
+  position: relative;
+  padding-left: calc(var(--space-lg) + 14px);
+}
+.roadmap-item::before {
+  content: '';
+  position: absolute;
+  left: var(--space-md);
+  top: var(--space-lg);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+.roadmap-item.completed::before {
+  background: var(--accent-primary);
+}
+.roadmap-item.current::before {
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 4px rgba(0, 212, 170, 0.2);
+}
+.phase-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+.roadmap-item.completed .phase-label,
+.roadmap-item.current .phase-label {
+  color: var(--accent-primary);
+}
+.roadmap-item h3 {
+  margin: 2px 0 2px;
+}
+.roadmap-item p {
+  font-size: 0.9rem;
+}
+
+/* ============================================
+   TEAM
+   ============================================ */
+.team-section {
+  margin-bottom: var(--space-lg);
+}
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+.team-card {
+  padding: var(--space-lg);
+  text-align: center;
+}
+.team-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-color-strong);
+}
+.team-avatar {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--space-sm);
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.7rem;
+}
+.team-card h4 {
+  margin-bottom: 2px;
+}
+.team-role {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.section-header {
+  margin-bottom: var(--space-lg);
+}
+
+@media (max-width: 900px) {
+  .mission-section { grid-template-columns: 1fr; text-align: center; }
+  .sdg-grid { grid-template-columns: repeat(2, 1fr); }
+  .tech-grid { grid-template-columns: repeat(2, 1fr); }
+  .team-grid { grid-template-columns: repeat(2, 1fr); }
+  .comparison-table { display: block; overflow-x: auto; white-space: nowrap; }
+}
+@media (max-width: 560px) {
+  .sdg-grid { grid-template-columns: 1fr; }
+  .tech-grid { grid-template-columns: repeat(2, 1fr); }
+  .team-grid { grid-template-columns: 1fr; }
+}

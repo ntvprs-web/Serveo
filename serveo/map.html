@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="SERVEO Live Map — Discover real-time community events near you on an interactive map.">
+    <title>Live Map — SERVEO</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/map.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+    <style>
+        .marker-cluster {
+            background: rgba(0, 212, 170, 0.2) !important;
+        }
+
+        .marker-cluster div {
+            background: rgba(0, 212, 170, 0.6) !important;
+            color: #fff !important;
+            font-weight: 700 !important;
+            font-family: var(--font-display) !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ambient-bg"></div>
+    <div id="navbar-root"></div>
+
+    <div class="map-page">
+        <!-- Toolbar -->
+        <div class="map-toolbar">
+            <div class="map-toolbar-left">
+                <div class="map-search">
+                    <span>🔍</span>
+                    <input type="text" id="map-search-input" placeholder="Search events, cities...">
+                </div>
+                <div class="filter-chips" id="filter-chips">
+                    <button class="filter-chip active" data-category="all">All</button>
+                    <button class="filter-chip" data-category="blood">💉 Blood</button>
+                    <button class="filter-chip" data-category="medical">🏥 Medical</button>
+                    <button class="filter-chip" data-category="food">🍱 Food</button>
+                    <button class="filter-chip" data-category="disaster">🆘 Disaster</button>
+                    <button class="filter-chip" data-category="animal">🐾 Animal</button>
+                    <button class="filter-chip" data-category="environment">🌱 Environ</button>
+                    <button class="filter-chip" data-category="education">📚 Education</button>
+                </div>
+            </div>
+            <div class="map-toolbar-right">
+                <button class="btn btn-secondary btn-sm" id="near-me-btn">📍 Near Me</button>
+            </div>
+        </div>
+
+        <!-- Map -->
+        <div class="map-container">
+            <div id="main-map"></div>
+            <div class="event-counter" id="event-counter">
+                Showing <span id="visible-count">18</span> events
+            </div>
+            <button class="locate-btn" id="locate-btn" title="Center on my location">📍</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.getElementById('navbar-root').innerHTML = getNavbarHTML('map');
+
+        // Initialize Map
+        const map = L.map('main-map', {
+            zoomControl: true,
+            attributionControl: false
+        }).setView([22.5, 79], 5);
+
+        // ===== API KEY: paste your Mapbox public token (starts with "pk.") below =====
+        const MAPBOX_TOKEN = 'pk.eyJ1IjoibmlzaGFudDIyIiwiYSI6ImNtdXo4cnAwZDBjMGcyenM5cWdqc2pmaDcifQ.q50Yt3xBnL3EEF1-6c6O0g';
+
+        L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
+            tileSize: 512,
+            zoomOffset: -1,
+            maxZoom: 19,
+            attribution: '© Mapbox © OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Marker cluster group
+        const clusterGroup = L.markerClusterGroup({
+            maxClusterRadius: 50,
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false
+        });
+
+        let allMarkers = [];
+        let activeFilter = 'all';
+
+        // Create markers
+        function createMarkers(events) {
+            clusterGroup.clearLayers();
+            allMarkers = [];
+            let count = 0;
+
+            events.forEach(event => {
+                const cat = CATEGORIES[event.category];
+                const icon = L.divIcon({
+                    className: 'custom-marker-wrap',
+                    html: `<div class="custom-marker" style="background:${cat.color}">${cat.icon}</div>`,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18],
+                    popupAnchor: [0, -20]
+                });
+
+                const marker = L.marker([event.lat, event.lng], { icon });
+                marker.eventData = event;
+
+                // Popup
+                const popupHTML = `
+          <div class="map-popup">
+            <div class="popup-badges">
+              ${urgencyBadgeHTML(event)}
+              ${verifiedBadgeHTML(event)}
+            </div>
+            <h3>${event.title}</h3>
+            <p class="popup-org">${event.organizer}</p>
+            <div class="popup-meta">
+              <span>📅 ${formatEventDate(event.date)}</span>
+              <span>🕐 ${formatEventTime(event)}</span>
+              <span>📍 ${event.address}</span>
+            </div>
+            ${volunteerProgressHTML(event)}
+            <div class="popup-actions">
+              <a href="event-detail.html?id=${event.id}" class="btn btn-primary btn-sm">View Details</a>
+              <a href="${getDirectionsURL(event.lat, event.lng)}" target="_blank" class="btn btn-secondary btn-sm">🧭 Directions</a>
+            </div>
+          </div>`;
+
+                marker.bindPopup(popupHTML, { maxWidth: 320 });
+                clusterGroup.addLayer(marker);
+                allMarkers.push(marker);
+                count++;
+            });
+
+            map.addLayer(clusterGroup);
+            document.getElementById('visible-count').textContent = count;
+        }
+
+        // Initial render
+        createMarkers(EVENTS_DATA);
+
+        // Filter chips
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                activeFilter = chip.dataset.category;
+
+                const filtered = activeFilter === 'all'
+                    ? EVENTS_DATA
+                    : EVENTS_DATA.filter(e => e.category === activeFilter);
+                createMarkers(filtered);
+            });
+        });
+
+        // Search
+        document.getElementById('map-search-input').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = EVENTS_DATA.filter(ev =>
+                (activeFilter === 'all' || ev.category === activeFilter) &&
+                (ev.title.toLowerCase().includes(query) ||
+                    ev.city.toLowerCase().includes(query) ||
+                    ev.organizer.toLowerCase().includes(query))
+            );
+            createMarkers(filtered);
+        });
+
+        // Near Me / Locate
+        async function centerOnUser() {
+            try {
+                const loc = await getUserLocation();
+                map.flyTo([loc.lat, loc.lng], 12, { duration: 1.5 });
+
+                // Add user marker
+                const userIcon = L.divIcon({
+                    className: 'user-loc',
+                    html: `<div style="width:14px;height:14px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 15px #3b82f699;"></div>`,
+                    iconSize: [14, 14]
+                });
+                L.marker([loc.lat, loc.lng], { icon: userIcon }).addTo(map)
+                    .bindPopup('<b>You are here</b>').openPopup();
+
+                showToast('📍 Location found!');
+            } catch {
+                showToast('Could not get location', 'info');
+            }
+        }
+
+        document.getElementById('locate-btn').addEventListener('click', centerOnUser);
+        document.getElementById('near-me-btn').addEventListener('click', centerOnUser);
+    </script>
+</body>
+
+</html>
