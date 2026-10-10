@@ -3,7 +3,7 @@
   flex-direction: column;
   height: calc(100vh - 72px);
 }
-
+ 
 /* ============================================
    TOOLBAR
    ============================================ */
@@ -28,8 +28,12 @@
 }
 .map-toolbar-right {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-
+ 
 .map-search {
   display: flex;
   align-items: center;
@@ -51,7 +55,37 @@
 .map-search input::placeholder {
   color: var(--text-tertiary);
 }
-
+ 
+/* Distance / date dropdowns */
+.map-select {
+  padding: 0.45rem 0.7rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  outline: none;
+}
+.map-select option {
+  background: var(--bg-elevated, #1a202c);
+  color: var(--text-primary);
+}
+.map-select:focus {
+  border-color: var(--accent-primary);
+}
+ 
+/* "Saved" toggle on */
+#saved-toggle.is-active {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+#saved-count {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+ 
 /* ============================================
    MAP CONTAINER
    ============================================ */
@@ -65,14 +99,18 @@
   height: 100%;
   background: var(--bg-primary);
 }
-
+/* Keep the map on its own GPU layer for smoother panning/zooming */
+#main-map .leaflet-map-pane,
+#main-map .leaflet-tile-pane {
+  will-change: transform;
+}
+ 
 .event-counter {
   position: absolute;
   bottom: var(--space-lg);
   left: var(--space-lg);
   z-index: 10;
-  background: rgba(20, 25, 36, 0.85);
-  backdrop-filter: blur(10px);
+  background: rgba(20, 25, 36, 0.92);
   border: 1px solid var(--border-color-strong);
   padding: 0.6rem 1.1rem;
   border-radius: var(--radius-full);
@@ -84,7 +122,7 @@
   font-weight: 700;
   font-family: var(--font-mono);
 }
-
+ 
 .locate-btn {
   position: absolute;
   bottom: var(--space-lg);
@@ -103,7 +141,7 @@
 .locate-btn:hover {
   transform: scale(1.08);
 }
-
+ 
 /* ============================================
    CUSTOM MARKERS
    ============================================ */
@@ -127,12 +165,12 @@
   transform: rotate(-45deg);
   display: block;
 }
-
+ 
 .user-loc {
   background: none;
   border: none;
 }
-
+ 
 /* ============================================
    MAP POPUP
    ============================================ */
@@ -152,7 +190,7 @@
 .leaflet-container a.leaflet-popup-close-button:hover {
   color: var(--text-primary) !important;
 }
-
+ 
 .map-popup {
   font-family: var(--font-body);
   min-width: 220px;
@@ -184,17 +222,74 @@
   display: flex;
   gap: 8px;
 }
+.popup-actions + .popup-actions {
+  margin-top: 8px;
+}
 .popup-actions .btn {
   flex: 1;
   padding: 0.5rem 0.7rem;
   font-size: 0.78rem;
+  text-align: center;
+  cursor: pointer;
 }
-
+.popup-share {
+  color: #25d366 !important;
+  border-color: rgba(37, 211, 102, 0.5) !important;
+}
+.popup-actions .js-save.is-saved {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+}
+ 
 /* ============================================
    RESPONSIVE
    ============================================ */
 @media (max-width: 720px) {
   .map-toolbar { flex-direction: column; align-items: stretch; }
   .map-toolbar-left { flex-direction: column; align-items: stretch; }
+  .map-toolbar-right { width: 100%; }
+  .map-select { flex: 1; min-width: 0; }
   .map-search { min-width: 0; }
 }
+ 
+ 
+/* ============================================
+   MAPBOX GL (popups & controls)
+   ============================================ */
+.mapboxgl-popup-content {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--border-color-strong);
+  box-shadow: var(--shadow-lift) !important;
+  padding: 14px 16px !important;
+}
+.mapboxgl-popup-close-button {
+  color: var(--text-secondary) !important;
+  font-size: 20px;
+  padding: 2px 8px;
+}
+.mapboxgl-popup-close-button:hover {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+}
+.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip { border-top-color: var(--bg-elevated) !important; }
+.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip { border-bottom-color: var(--bg-elevated) !important; }
+.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: var(--bg-elevated) !important; }
+.mapboxgl-ctrl-group {
+  border-radius: 6px !important;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
+}
+.mapboxgl-ctrl-group button {
+  width: 32px !important;
+  height: 32px !important;
+}
+.mapboxgl-popup { z-index: 5; }
+ 

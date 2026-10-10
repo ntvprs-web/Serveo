@@ -4,14 +4,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SERVEO Impact Dashboard — Real-time metrics on community welfare across India.">
-    <title>Impact Dashboard — SERVEO</title>
+    <meta name="description" content="SERVEO Impact Dashboard — Real-time metrics and analytics on community welfare across India.">
+    <title>Impact Dashboard & Analytics — SERVEO</title>
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/navbar.css">
     <link rel="stylesheet" href="css/impact.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+    <!-- Chart.js for GPU-accelerated interactive charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        .chart-wrapper {
+            position: relative;
+            height: 280px;
+            width: 100%;
+        }
+        .sdg-progress-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: var(--space-md);
+            margin-top: var(--space-lg);
+        }
+        .sdg-card {
+            padding: var(--space-lg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            background: rgba(20, 25, 36, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .sdg-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .sdg-badge {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-weight: 800;
+            font-family: var(--font-mono);
+            font-size: 0.95rem;
+        }
+        .sdg-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .sdg-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            transition: width 1s ease;
+        }
+    </style>
 </head>
 
 <body>
@@ -21,277 +73,224 @@
     <div class="impact-page">
         <div class="impact-header">
             <div class="container">
-                <h1>Impact <span class="gradient-text">Dashboard</span></h1>
-                <p>Real-time, anonymized metrics showcasing the collective impact of SERVEO communities across India.
-                </p>
+                <h1>Impact <span class="gradient-text">Analytics</span></h1>
+                <p>Real-time telemetry and verified metrics showcasing social impact across Indian communities.</p>
             </div>
         </div>
 
         <div class="container">
-            <!-- Big Stats -->
+            <!-- Big Stats Top Banner -->
             <div class="impact-stats-grid">
                 <div class="impact-stat-card glass-card animate-on-scroll">
                     <div class="impact-stat-icon">🎯</div>
-                    <div class="impact-stat-number" data-count="1247">0</div>
+                    <div class="impact-stat-number" id="stat-events" data-count="1247">0</div>
                     <div class="impact-stat-label">Total Events Facilitated</div>
                 </div>
                 <div class="impact-stat-card glass-card animate-on-scroll">
                     <div class="impact-stat-icon">👥</div>
-                    <div class="impact-stat-number" data-count="28450">0</div>
+                    <div class="impact-stat-number" id="stat-volunteers" data-count="28450">0</div>
                     <div class="impact-stat-label">Volunteers Mobilized</div>
                 </div>
                 <div class="impact-stat-card glass-card animate-on-scroll">
                     <div class="impact-stat-icon">💉</div>
-                    <div class="impact-stat-number" data-count="18200">0</div>
+                    <div class="impact-stat-number" id="stat-blood" data-count="18200">0</div>
                     <div class="impact-stat-label">Blood Units Collected</div>
                 </div>
                 <div class="impact-stat-card glass-card animate-on-scroll">
                     <div class="impact-stat-icon">🏙️</div>
-                    <div class="impact-stat-number" data-count="42">0</div>
-                    <div class="impact-stat-label">Cities Active</div>
+                    <div class="impact-stat-number" id="stat-cities" data-count="42">0</div>
+                    <div class="impact-stat-label">Active Cities Across India</div>
                 </div>
             </div>
 
-            <!-- Charts -->
+            <!-- Interactive Chart Grid -->
             <div class="charts-grid">
-                <!-- Category Distribution -->
-                <div class="chart-card glass-card">
-                    <h3>📊 Events by Category</h3>
-                    <div class="bar-chart" id="category-bars">
-                        <div class="bar-row">
-                            <span class="bar-label">💉 Blood</span>
-                            <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--cat-blood)" data-width="78%">312
-                                    events</div>
-                            </div>
-                        </div>
-                        <div class="bar-row">
-                            <span class="bar-label">🏥 Medical</span>
-                            <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--cat-medical)" data-width="55%">
-                                    219 events</div>
-                            </div>
-                        </div>
-                        <div class="bar-row">
-                            <span class="bar-label">🍱 Food</span>
-                            <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--cat-food)" data-width="67%">268
-                                    events</div>
-                            </div>
-                        </div>
-                        <div class="bar-row">
-                            <span class="bar-label">🆘 Disaster</span>
-                            <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--cat-disaster)" data-width="42%">
-                                    167 events</div>
-                            </div>
-                        </div>
-                        <div class="bar-row">
-                            <span class="bar-label">🐾 Animal</span>
-                            <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--cat-animal)" data-width="30%">
-                                    120 events</div>
-                            </div>
-                        </div>
-                        <div class="bar-row">
-                            <span class="bar-label">🌱 Environment</span>
-                            <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--cat-environment)"
-                                    data-width="38%">98 events</div>
-                            </div>
-                        </div>
-                        <div class="bar-row">
-                            <span class="bar-label">📚 Education</span>
-                            <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--cat-education)"
-                                    data-width="25%">63 events</div>
-                            </div>
-                        </div>
+                <!-- Monthly Growth Timeline Chart -->
+                <div class="chart-card glass-card" style="grid-column: 1 / -1;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+                        <h3>📈 Monthly Volunteer & Welfare Mobilization (2026)</h3>
+                        <span class="badge badge-verified">✓ Live Telemetry</span>
+                    </div>
+                    <div class="chart-wrapper" style="height: 300px;">
+                        <canvas id="growthChart"></canvas>
                     </div>
                 </div>
 
-                <!-- Donut Chart -->
+                <!-- Category Doughnut Distribution -->
                 <div class="chart-card glass-card">
-                    <h3>🥧 Volunteer Distribution</h3>
-                    <div class="donut-container">
-                        <div class="donut-chart" style="background: conic-gradient(
-              var(--cat-blood) 0% 25%,
-              var(--cat-food) 25% 43%,
-              var(--cat-medical) 43% 58%,
-              var(--cat-disaster) 58% 72%,
-              var(--cat-environment) 72% 82%,
-              var(--cat-animal) 82% 90%,
-              var(--cat-education) 90% 100%
-            );">
-                            <div class="donut-center"
-                                style="width:100px;height:100px;border-radius:50%;background:var(--bg-card);">
-                                <div class="donut-total">28.4K</div>
-                                <div class="donut-label">Total</div>
-                            </div>
-                        </div>
-                        <div class="donut-legend">
-                            <div class="legend-item"><span class="legend-dot"
-                                    style="background:var(--cat-blood)"></span> Blood Drives <span
-                                    class="legend-value">25%</span></div>
-                            <div class="legend-item"><span class="legend-dot" style="background:var(--cat-food)"></span>
-                                Food Distribution <span class="legend-value">18%</span></div>
-                            <div class="legend-item"><span class="legend-dot"
-                                    style="background:var(--cat-medical)"></span> Medical Camps <span
-                                    class="legend-value">15%</span></div>
-                            <div class="legend-item"><span class="legend-dot"
-                                    style="background:var(--cat-disaster)"></span> Disaster Relief <span
-                                    class="legend-value">14%</span></div>
-                            <div class="legend-item"><span class="legend-dot"
-                                    style="background:var(--cat-environment)"></span> Environment <span
-                                    class="legend-value">10%</span></div>
-                            <div class="legend-item"><span class="legend-dot"
-                                    style="background:var(--cat-animal)"></span> Animal Rescue <span
-                                    class="legend-value">8%</span></div>
-                            <div class="legend-item"><span class="legend-dot"
-                                    style="background:var(--cat-education)"></span> Education <span
-                                    class="legend-value">10%</span></div>
-                        </div>
+                    <h3>🥧 Welfare Drives by Category</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="categoryChart"></canvas>
                     </div>
                 </div>
 
-                <!-- Secondary Stats -->
+                <!-- Top Cities Bar Chart -->
                 <div class="chart-card glass-card">
-                    <h3>🍱 Key Milestones</h3>
+                    <h3>🏙️ Top Active Hubs & Cities</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="citiesChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Secondary Milestones -->
+                <div class="chart-card glass-card">
+                    <h3>🍱 Key Field Milestones</h3>
                     <div class="bar-chart">
                         <div class="bar-row">
                             <span class="bar-label">Meals Served</span>
                             <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--accent-gradient)"
-                                    data-width="85%">3,40,000</div>
+                                <div class="bar-fill" style="width:85%; background: var(--accent-gradient)">3,40,000</div>
                             </div>
                         </div>
                         <div class="bar-row">
                             <span class="bar-label">Trees Planted</span>
                             <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--accent-gradient-cool)"
-                                    data-width="52%">52,000</div>
+                                <div class="bar-fill" style="width:52%; background: var(--accent-gradient-cool)">52,000</div>
                             </div>
                         </div>
                         <div class="bar-row">
                             <span class="bar-label">Animals Rescued</span>
                             <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--cat-animal)" data-width="35%">
-                                    4,800</div>
+                                <div class="bar-fill" style="width:38%; background: var(--cat-animal)">4,800</div>
                             </div>
                         </div>
                         <div class="bar-row">
                             <span class="bar-label">Free Checkups</span>
                             <div class="bar-track">
-                                <div class="bar-fill" style="width:0; background: var(--cat-medical)" data-width="60%">
-                                    28,500</div>
+                                <div class="bar-fill" style="width:64%; background: var(--cat-medical)">28,500</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Recent Activity -->
+                <!-- Live Activity Feed -->
                 <div class="chart-card glass-card">
-                    <h3>⚡ Live Activity Feed</h3>
-                    <div class="activity-list">
+                    <h3>⚡ Live Verified Feed</h3>
+                    <div class="activity-list" id="activity-feed">
                         <div class="activity-item">
                             <div class="activity-icon" style="background:rgba(239,68,68,0.15)">💉</div>
                             <div class="activity-content">
                                 <strong>Emergency Blood Donation Camp</strong>
-                                <p>87 donors have joined in New Delhi</p>
+                                <p>87 donors registered in New Delhi</p>
                             </div>
-                            <span class="activity-time">2 min ago</span>
+                            <span class="activity-time">Just now</span>
                         </div>
                         <div class="activity-item">
                             <div class="activity-icon" style="background:rgba(245,158,11,0.15)">🍱</div>
                             <div class="activity-content">
-                                <strong>10,000 Meals Challenge</strong>
-                                <p>Crossed 75% target in Pune!</p>
+                                <strong>Food Distribution Drive</strong>
+                                <p>120 volunteers active in Dharavi, Mumbai</p>
                             </div>
-                            <span class="activity-time">8 min ago</span>
+                            <span class="activity-time">5m ago</span>
                         </div>
                         <div class="activity-item">
                             <div class="activity-icon" style="background:rgba(16,185,129,0.15)">🌱</div>
                             <div class="activity-content">
-                                <strong>New Event Published</strong>
-                                <p>Tree Plantation Drive — Delhi Greens Trust</p>
+                                <strong>Tree Plantation Marathon</strong>
+                                <p>200 saplings planted in Dehradun</p>
                             </div>
-                            <span class="activity-time">15 min ago</span>
+                            <span class="activity-time">18m ago</span>
                         </div>
                         <div class="activity-item">
                             <div class="activity-icon" style="background:rgba(6,182,212,0.15)">🏥</div>
                             <div class="activity-content">
-                                <strong>Free Eye Surgery Camp</strong>
-                                <p>42 surgeries completed in Madurai</p>
+                                <strong>Free Eye Care Outreach</strong>
+                                <p>42 screenings completed in Madurai</p>
                             </div>
-                            <span class="activity-time">22 min ago</span>
-                        </div>
-                        <div class="activity-item">
-                            <div class="activity-icon" style="background:rgba(139,92,246,0.15)">🐾</div>
-                            <div class="activity-content">
-                                <strong>Vaccination Camp Chennai</strong>
-                                <p>120 street dogs vaccinated so far</p>
-                            </div>
-                            <span class="activity-time">35 min ago</span>
+                            <span class="activity-time">32m ago</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- City Coverage -->
+            <!-- UN SDG Alignment & Progress Section -->
             <div class="section">
                 <div class="section-header">
-                    <h2>🏙️ City <span class="gradient-text">Coverage</span></h2>
-                    <p>SERVEO is active across 42 cities and growing.</p>
+                    <h2>🎯 UN Sustainable Development <span class="gradient-text">Goals Progress</span></h2>
+                    <p>Direct tracking against United Nations 2030 Sustainable Development Goals.</p>
+                </div>
+                <div class="sdg-progress-grid">
+                    <div class="sdg-card glass-card">
+                        <div class="sdg-header">
+                            <div class="sdg-badge" style="background:#4c9f38;">3</div>
+                            <div>
+                                <h4 style="margin:0; font-size:0.95rem;">Good Health & Well-Being</h4>
+                                <small style="color:var(--text-secondary);">Blood drives, medical & dental camps</small>
+                            </div>
+                        </div>
+                        <div class="sdg-bar">
+                            <div class="sdg-bar-fill" style="width:84%; background:#4c9f38;"></div>
+                        </div>
+                        <small style="color:var(--accent-primary); font-weight:700;">84% Target Achieved</small>
+                    </div>
+
+                    <div class="sdg-card glass-card">
+                        <div class="sdg-header">
+                            <div class="sdg-badge" style="background:#fd9d24;">11</div>
+                            <div>
+                                <h4 style="margin:0; font-size:0.95rem;">Sustainable Cities</h4>
+                                <small style="color:var(--text-secondary);">Disaster & flood relief mobilization</small>
+                            </div>
+                        </div>
+                        <div class="sdg-bar">
+                            <div class="sdg-bar-fill" style="width:72%; background:#fd9d24;"></div>
+                        </div>
+                        <small style="color:var(--accent-primary); font-weight:700;">72% Target Achieved</small>
+                    </div>
+
+                    <div class="sdg-card glass-card">
+                        <div class="sdg-header">
+                            <div class="sdg-badge" style="background:#00689d;">16</div>
+                            <div>
+                                <h4 style="margin:0; font-size:0.95rem;">Peace & Strong Institutions</h4>
+                                <small style="color:var(--text-secondary);">100% Verified NGO accountability</small>
+                            </div>
+                        </div>
+                        <div class="sdg-bar">
+                            <div class="sdg-bar-fill" style="width:96%; background:#00689d;"></div>
+                        </div>
+                        <small style="color:var(--accent-primary); font-weight:700;">96% Trust Index</small>
+                    </div>
+
+                    <div class="sdg-card glass-card">
+                        <div class="sdg-header">
+                            <div class="sdg-badge" style="background:#19486a;">17</div>
+                            <div>
+                                <h4 style="margin:0; font-size:0.95rem;">Partnerships for Goals</h4>
+                                <small style="color:var(--text-secondary);">Cross-sector NGO & citizen alliance</small>
+                            </div>
+                        </div>
+                        <div class="sdg-bar">
+                            <div class="sdg-bar-fill" style="width:88%; background:#19486a;"></div>
+                        </div>
+                        <small style="color:var(--accent-primary); font-weight:700;">88% Network Density</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- City Coverage Section -->
+            <div class="section">
+                <div class="section-header">
+                    <h2>🏙️ Geographic <span class="gradient-text">Reach</span></h2>
+                    <p>Active volunteer clusters across Indian metropolitan & tier-2 cities.</p>
                 </div>
                 <div class="city-grid">
-                    <div class="city-card"><span class="city-name">New Delhi</span>
-                        <div class="city-count">187 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Mumbai</span>
-                        <div class="city-count">156 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Bengaluru</span>
-                        <div class="city-count">134 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Chennai</span>
-                        <div class="city-count">98 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Hyderabad</span>
-                        <div class="city-count">89 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Pune</span>
-                        <div class="city-count">76 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Kolkata</span>
-                        <div class="city-count">67 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Jaipur</span>
-                        <div class="city-count">52 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Patna</span>
-                        <div class="city-count">48 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Bhopal</span>
-                        <div class="city-count">41 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Lucknow</span>
-                        <div class="city-count">38 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Ahmedabad</span>
-                        <div class="city-count">35 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Dehradun</span>
-                        <div class="city-count">28 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Madurai</span>
-                        <div class="city-count">24 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Chandigarh</span>
-                        <div class="city-count">22 events</div>
-                    </div>
-                    <div class="city-card"><span class="city-name">Kochi</span>
-                        <div class="city-count">19 events</div>
-                    </div>
+                    <div class="city-card"><span class="city-name">New Delhi</span><div class="city-count">187 events</div></div>
+                    <div class="city-card"><span class="city-name">Mumbai</span><div class="city-count">156 events</div></div>
+                    <div class="city-card"><span class="city-name">Bengaluru</span><div class="city-count">134 events</div></div>
+                    <div class="city-card"><span class="city-name">Chennai</span><div class="city-count">98 events</div></div>
+                    <div class="city-card"><span class="city-name">Hyderabad</span><div class="city-count">89 events</div></div>
+                    <div class="city-card"><span class="city-name">Pune</span><div class="city-count">76 events</div></div>
+                    <div class="city-card"><span class="city-name">Kolkata</span><div class="city-count">67 events</div></div>
+                    <div class="city-card"><span class="city-name">Jaipur</span><div class="city-count">52 events</div></div>
+                    <div class="city-card"><span class="city-name">Patna</span><div class="city-count">48 events</div></div>
+                    <div class="city-card"><span class="city-name">Bhopal</span><div class="city-count">41 events</div></div>
+                    <div class="city-card"><span class="city-name">Lucknow</span><div class="city-count">38 events</div></div>
+                    <div class="city-card"><span class="city-name">Ahmedabad</span><div class="city-count">35 events</div></div>
+                    <div class="city-card"><span class="city-name">Dehradun</span><div class="city-count">28 events</div></div>
+                    <div class="city-card"><span class="city-name">Madurai</span><div class="city-count">24 events</div></div>
+                    <div class="city-card"><span class="city-name">Chandigarh</span><div class="city-count">22 events</div></div>
+                    <div class="city-card"><span class="city-name">Kochi</span><div class="city-count">19 events</div></div>
                 </div>
             </div>
         </div>
@@ -301,24 +300,126 @@
 
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
+    <script type="module" src="js/notifications.js"></script>
+    <script type="module" src="js/i18n.js"></script>
     <script>
         document.getElementById('navbar-root').innerHTML = getNavbarHTML('impact');
         document.getElementById('footer-root').innerHTML = getFooterHTML();
 
-        // Animate bar charts on scroll
-        const barObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.querySelectorAll('.bar-fill').forEach(bar => {
-                        bar.style.width = bar.dataset.width;
-                    });
-                    barObserver.unobserve(entry.target);
-                }
-            });
-        }, { threshold: 0.3 });
+        // Initialize Chart.js styling defaults for dark theme
+        Chart.defaults.color = '#99a3b3';
+        Chart.defaults.font.family = "'Public Sans', sans-serif";
 
-        document.querySelectorAll('.bar-chart').forEach(chart => {
-            barObserver.observe(chart);
+        // 1. Monthly Growth Area Chart
+        const growthCtx = document.getElementById('growthChart').getContext('2d');
+        const gradientTeal = growthCtx.createLinearGradient(0, 0, 0, 300);
+        gradientTeal.addColorStop(0, 'rgba(0, 212, 170, 0.45)');
+        gradientTeal.addColorStop(1, 'rgba(0, 212, 170, 0.0)');
+
+        const gradientCyan = growthCtx.createLinearGradient(0, 0, 0, 300);
+        gradientCyan.addColorStop(0, 'rgba(6, 182, 212, 0.4)');
+        gradientCyan.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+
+        new Chart(growthCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
+                datasets: [
+                    {
+                        label: 'Volunteers Mobilized',
+                        data: [1200, 2400, 4800, 7900, 11500, 15800, 19200, 23100, 26400, 28450],
+                        borderColor: '#00d4aa',
+                        backgroundColor: gradientTeal,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
+                    },
+                    {
+                        label: 'Welfare Drives Completed',
+                        data: [45, 95, 180, 310, 470, 680, 840, 990, 1120, 1247],
+                        borderColor: '#06b6d4',
+                        backgroundColor: gradientCyan,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } },
+                    tooltip: {
+                        backgroundColor: '#1a2130',
+                        borderColor: 'rgba(255,255,255,0.15)',
+                        borderWidth: 1,
+                        padding: 10
+                    }
+                },
+                scales: {
+                    x: { grid: { color: 'rgba(255,255,255,0.04)' } },
+                    y: { grid: { color: 'rgba(255,255,255,0.04)' } }
+                }
+            }
+        });
+
+        // 2. Category Doughnut Chart
+        const catCtx = document.getElementById('categoryChart').getContext('2d');
+        new Chart(catCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Blood Drives', 'Medical Camps', 'Food Distribution', 'Disaster Relief', 'Animal Rescue', 'Environment', 'Education'],
+                datasets: [{
+                    data: [312, 219, 268, 167, 120, 98, 63],
+                    backgroundColor: ['#ef4444', '#06b6d4', '#f59e0b', '#f97316', '#8b5cf6', '#10b981', '#3b82f6'],
+                    borderColor: '#141924',
+                    borderWidth: 3,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } },
+                    tooltip: { backgroundColor: '#1a2130', borderColor: 'rgba(255,255,255,0.15)', borderWidth: 1 }
+                },
+                cutout: '68%'
+            }
+        });
+
+        // 3. Top Cities Horizontal Bar Chart
+        const cityCtx = document.getElementById('citiesChart').getContext('2d');
+        new Chart(cityCtx, {
+            type: 'bar',
+            data: {
+                labels: ['New Delhi', 'Mumbai', 'Bengaluru', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata', 'Jaipur'],
+                datasets: [{
+                    label: 'Active Drives',
+                    data: [187, 156, 134, 98, 89, 76, 67, 52],
+                    backgroundColor: 'rgba(0, 212, 170, 0.75)',
+                    borderRadius: 6,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { backgroundColor: '#1a2130', borderColor: 'rgba(255,255,255,0.15)', borderWidth: 1 }
+                },
+                scales: {
+                    x: { grid: { color: 'rgba(255,255,255,0.04)' } },
+                    y: { grid: { display: false } }
+                }
+            }
         });
     </script>
 </body>

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-
+ 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,30 +10,16 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/navbar.css">
     <link rel="stylesheet" href="css/map.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
-    <style>
-        .marker-cluster {
-            background: rgba(0, 212, 170, 0.2) !important;
-        }
-
-        .marker-cluster div {
-            background: rgba(0, 212, 170, 0.6) !important;
-            color: #fff !important;
-            font-weight: 700 !important;
-            font-family: var(--font-display) !important;
-        }
-    </style>
 </head>
-
+ 
 <body>
     <div class="ambient-bg"></div>
     <div id="navbar-root"></div>
-
+ 
     <div class="map-page">
         <!-- Toolbar -->
         <div class="map-toolbar">
@@ -54,10 +40,26 @@
                 </div>
             </div>
             <div class="map-toolbar-right">
+                <select class="map-select" id="radius-select" title="Distance from you">
+                    <option value="0">📏 Any distance</option>
+                    <option value="5">Within 5 km</option>
+                    <option value="10">Within 10 km</option>
+                    <option value="25">Within 25 km</option>
+                    <option value="50">Within 50 km</option>
+                    <option value="100">Within 100 km</option>
+                </select>
+                <select class="map-select" id="date-select" title="Date">
+                    <option value="any">📅 Any date</option>
+                    <option value="today">Today</option>
+                    <option value="tomorrow">Tomorrow</option>
+                    <option value="weekend">This weekend</option>
+                    <option value="week">Next 7 days</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" id="saved-toggle" title="Show only saved events">⭐ Saved <span id="saved-count">0</span></button>
                 <button class="btn btn-secondary btn-sm" id="near-me-btn">📍 Near Me</button>
             </div>
         </div>
-
+ 
         <!-- Map -->
         <div class="map-container">
             <div id="main-map"></div>
@@ -67,143 +69,376 @@
             <button class="locate-btn" id="locate-btn" title="Center on my location">📍</button>
         </div>
     </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+ 
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <script src="js/maptiles.js"></script>
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
+    <script type="module" src="js/notifications.js"></script>
+    <script type="module" src="js/i18n.js"></script>
     <script>
         document.getElementById('navbar-root').innerHTML = getNavbarHTML('map');
-
-        // Initialize Map
-        const map = L.map('main-map', {
-            zoomControl: true,
-            attributionControl: false
-        }).setView([22.5, 79], 5);
-
-        // ===== API KEY: paste your Mapbox public token (starts with "pk.") below =====
-        const MAPBOX_TOKEN = 'pk.eyJ1IjoibmlzaGFudDIyIiwiYSI6ImNtdXo4cnAwZDBjMGcyenM5cWdqc2pmaDcifQ.q50Yt3xBnL3EEF1-6c6O0g';
-
-        L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
-            tileSize: 512,
-            zoomOffset: -1,
-            maxZoom: 19,
-            attribution: '© Mapbox © OpenStreetMap contributors'
-        }).addTo(map);
-
-        // Marker cluster group
-        const clusterGroup = L.markerClusterGroup({
-            maxClusterRadius: 50,
-            spiderfyOnMaxZoom: true,
-            showCoverageOnHover: false
-        });
-
-        let allMarkers = [];
-        let activeFilter = 'all';
-
-        // Create markers
-        function createMarkers(events) {
-            clusterGroup.clearLayers();
-            allMarkers = [];
-            let count = 0;
-
-            events.forEach(event => {
-                const cat = CATEGORIES[event.category];
-                const icon = L.divIcon({
-                    className: 'custom-marker-wrap',
-                    html: `<div class="custom-marker" style="background:${cat.color}">${cat.icon}</div>`,
-                    iconSize: [36, 36],
-                    iconAnchor: [18, 18],
-                    popupAnchor: [0, -20]
-                });
-
-                const marker = L.marker([event.lat, event.lng], { icon });
-                marker.eventData = event;
-
-                // Popup
-                const popupHTML = `
+ 
+        // ============ Map (Mapbox GL: GPU-rendered, smooth like Google Maps) ============
+        const map = serveoCreateMap('main-map', { center: [79, 22.5], zoom: 4, minZoom: 2 });
+        map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-left');
+ 
+        const EMPTY = { type: 'FeatureCollection', features: [] };
+        let mapReady = false;
+        let EVENTS = EVENTS_DATA;      // replaced by live Firestore events once they load
+        let currentEvents = EVENTS_DATA;
+        let activePopup = null;
+ 
+        // ============ Filter state ============
+        const state = { category: 'all', query: '', radius: 0, origin: null, date: 'any', savedOnly: false };
+ 
+        // Demo data uses a fixed "today" (DEMO_NOW from data.js).
+        // When you switch to real data, change this to: new Date()
+        const FILTER_NOW = DEMO_NOW;
+ 
+        // ============ Helpers ============
+        function escapeHTML(str) {
+            return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+ 
+        // Saved events (stored in this browser)
+        function getSaved() {
+            try { return JSON.parse(localStorage.getItem('serveo_saved') || '[]').map(String); } catch { return []; }
+        }
+        function setSaved(list) {
+            try { localStorage.setItem('serveo_saved', JSON.stringify(list)); } catch { }
+            document.getElementById('saved-count').textContent = list.length;
+        }
+ 
+        function dayDiff(dateStr) {
+            const today = new Date(FILTER_NOW.toDateString());
+            const d = new Date(dateStr + 'T00:00:00');
+            return Math.round((d - today) / 86400000);
+        }
+ 
+        function matchesDate(ev) {
+            const diff = dayDiff(ev.date);
+            const dow = new Date(ev.date + 'T00:00:00').getDay();
+            switch (state.date) {
+                case 'today': return diff === 0;
+                case 'tomorrow': return diff === 1;
+                case 'weekend': return diff >= 0 && diff <= 7 && (dow === 0 || dow === 6);
+                case 'week': return diff >= 0 && diff <= 6;
+                default: return true;
+            }
+        }
+ 
+        function shareURL(ev) {
+            return location.href.split('#')[0].split('?')[0] + '?event=' + ev.id;
+        }
+ 
+        function whatsappURL(ev) {
+            const text =
+                `🆘 ${ev.title}\n` +
+                `📅 ${formatEventDate(ev.date)}, ${formatEventTime(ev)}\n` +
+                `📍 ${ev.address}\n` +
+                `Organised by ${ev.organizer}\n\n` +
+                `See it on the SERVEO map: ${shareURL(ev)}`;
+            return 'https://wa.me/?text=' + encodeURIComponent(text);
+        }
+ 
+        // ============ Popup ============
+        function buildPopup(event) {
+            const saved = getSaved().includes(String(event.id));
+            const dist = (typeof userLocation === 'object' && userLocation)
+                ? haversineDistance(userLocation.lat, userLocation.lng, event.lat, event.lng) : null;
+            const distLine = dist !== null
+                ? `<span>🧭 ${dist.toFixed(1)} km ${userLocation.isFallback ? 'from New Delhi' : 'away'}</span>` : '';
+            return `
           <div class="map-popup">
             <div class="popup-badges">
               ${urgencyBadgeHTML(event)}
               ${verifiedBadgeHTML(event)}
             </div>
-            <h3>${event.title}</h3>
-            <p class="popup-org">${event.organizer}</p>
+            <h3>${escapeHTML(event.title)}</h3>
+            <p class="popup-org">${escapeHTML(event.organizer)}</p>
             <div class="popup-meta">
               <span>📅 ${formatEventDate(event.date)}</span>
               <span>🕐 ${formatEventTime(event)}</span>
-              <span>📍 ${event.address}</span>
+              <span>📍 ${escapeHTML(event.address)}</span>
+              ${distLine}
             </div>
             ${volunteerProgressHTML(event)}
             <div class="popup-actions">
-              <a href="event-detail.html?id=${event.id}" class="btn btn-primary btn-sm">View Details</a>
-              <a href="${getDirectionsURL(event.lat, event.lng)}" target="_blank" class="btn btn-secondary btn-sm">🧭 Directions</a>
+              <a href="event-detail.html?id=${encodeURIComponent(event.id)}" class="btn btn-primary btn-sm">View Details</a>
+              <a href="${getDirectionsURL(event.lat, event.lng)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">🧭 Directions</a>
+            </div>
+            <div class="popup-actions">
+              <a href="${whatsappURL(event)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm popup-share">💬 Share</a>
+              <button type="button" class="btn btn-secondary btn-sm js-save ${saved ? 'is-saved' : ''}" data-id="${escapeHTML(event.id)}">${saved ? '★ Saved' : '☆ Save'}</button>
             </div>
           </div>`;
-
-                marker.bindPopup(popupHTML, { maxWidth: 320 });
-                clusterGroup.addLayer(marker);
-                allMarkers.push(marker);
-                count++;
-            });
-
-            map.addLayer(clusterGroup);
-            document.getElementById('visible-count').textContent = count;
         }
-
-        // Initial render
-        createMarkers(EVENTS_DATA);
-
-        // Filter chips
+ 
+        function openEventPopup(ev) {
+            if (activePopup) activePopup.remove();
+            activePopup = new mapboxgl.Popup({ offset: [0, -32], maxWidth: '320px' })
+                .setLngLat([ev.lng, ev.lat])
+                .setHTML(buildPopup(ev))
+                .addTo(map);
+ 
+            const btn = activePopup.getElement().querySelector('.js-save');
+            if (!btn) return;
+            btn.addEventListener('click', () => {
+                const id = String(ev.id);
+                let list = getSaved();
+                if (list.includes(id)) {
+                    list = list.filter(x => x !== id);
+                    btn.textContent = '☆ Save';
+                    btn.classList.remove('is-saved');
+                    showToast('Removed from saved', 'info');
+                } else {
+                    list.push(id);
+                    btn.textContent = '★ Saved';
+                    btn.classList.add('is-saved');
+                    showToast('⭐ Event saved');
+                }
+                setSaved(list);
+                if (state.savedOnly) applyFilters();
+            });
+        }
+ 
+        // ============ Put events on the map ============
+        function toGeoJSON(events) {
+            return {
+                type: 'FeatureCollection',
+                features: events.map(ev => ({
+                    type: 'Feature',
+                    properties: { id: String(ev.id), category: CATEGORIES[ev.category] ? ev.category : 'blood' },
+                    geometry: { type: 'Point', coordinates: [Number(ev.lng), Number(ev.lat)] }
+                }))
+            };
+        }
+ 
+        function showEvents(events) {
+            currentEvents = events;
+            document.getElementById('visible-count').textContent = events.length;
+            if (mapReady) map.getSource('events').setData(toGeoJSON(events));
+        }
+ 
+        map.on('load', () => {
+            // one round pin image per category
+            Object.entries(CATEGORIES).forEach(([key, cat]) => {
+                map.addImage('pin-' + key, serveoPinImage(cat.icon, cat.color), { pixelRatio: 2 });
+            });
+ 
+            map.addSource('events', { type: 'geojson', data: toGeoJSON(currentEvents), cluster: true, clusterMaxZoom: 13, clusterRadius: 50 });
+            map.addSource('radius', { type: 'geojson', data: EMPTY });
+ 
+            map.addLayer({ id: 'radius-fill', type: 'fill', source: 'radius', paint: { 'fill-color': '#00d4aa', 'fill-opacity': 0.06 } });
+            map.addLayer({ id: 'radius-line', type: 'line', source: 'radius', paint: { 'line-color': '#00d4aa', 'line-width': 1.5 } });
+ 
+            map.addLayer({
+                id: 'clusters', type: 'circle', source: 'events', filter: ['has', 'point_count'],
+                paint: {
+                    'circle-color': 'rgba(0, 212, 170, 0.75)',
+                    'circle-radius': ['step', ['get', 'point_count'], 18, 5, 22, 10, 28],
+                    'circle-stroke-width': 6,
+                    'circle-stroke-color': 'rgba(0, 212, 170, 0.25)'
+                }
+            });
+            map.addLayer({
+                id: 'cluster-count', type: 'symbol', source: 'events', filter: ['has', 'point_count'],
+                layout: {
+                    'text-field': ['get', 'point_count_abbreviated'],
+                    'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+                    'text-size': 13, 'text-allow-overlap': true
+                },
+                paint: { 'text-color': '#ffffff' }
+            });
+            map.addLayer({
+                id: 'event-points', type: 'symbol', source: 'events', filter: ['!', ['has', 'point_count']],
+                layout: {
+                    'icon-image': ['concat', 'pin-', ['get', 'category']],
+                    'icon-allow-overlap': true,
+                    'icon-size': 1,
+                    'icon-anchor': 'bottom',
+                    'icon-offset': [0, 0]
+                }
+            });
+ 
+            // click a cluster -> zoom in
+            map.on('click', 'clusters', (e) => {
+                const f = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0];
+                map.getSource('events').getClusterExpansionZoom(f.properties.cluster_id, (err, zoom) => {
+                    if (err) return;
+                    map.easeTo({ center: f.geometry.coordinates, zoom: zoom + 0.5 });
+                });
+            });
+ 
+            // click a pin -> popup
+            map.on('click', 'event-points', (e) => {
+                const id = e.features[0].properties.id;
+                const ev = EVENTS.find(x => String(x.id) === String(id));
+                if (ev) openEventPopup(ev);
+            });
+ 
+            ['clusters', 'event-points'].forEach(layer => {
+                map.on('mouseenter', layer, () => map.getCanvas().style.cursor = 'pointer');
+                map.on('mouseleave', layer, () => map.getCanvas().style.cursor = '');
+            });
+ 
+            mapReady = true;
+        });
+ 
+        // ============ One function applies every filter ============
+        function applyFilters(fitToRadius = false) {
+            const q = state.query.toLowerCase();
+            const saved = getSaved();
+ 
+            const filtered = EVENTS.filter(ev => {
+                if (state.category !== 'all' && ev.category !== state.category) return false;
+                if (q && !(ev.title.toLowerCase().includes(q) ||
+                    ev.city.toLowerCase().includes(q) ||
+                    ev.organizer.toLowerCase().includes(q))) return false;
+                if (!matchesDate(ev)) return false;
+                if (state.savedOnly && !saved.includes(String(ev.id))) return false;
+                if (state.radius && state.origin &&
+                    haversineDistance(state.origin.lat, state.origin.lng, ev.lat, ev.lng) > state.radius) return false;
+                return true;
+            });
+ 
+            // Radius circle
+            if (mapReady) {
+                if (state.radius && state.origin) {
+                    const circle = serveoCircleFeature(state.origin.lng, state.origin.lat, state.radius);
+                    map.getSource('radius').setData(circle);
+                    if (fitToRadius) {
+                        map.fitBounds(serveoBounds(circle.geometry.coordinates[0]), { padding: 40, duration: 1200 });
+                    }
+                } else {
+                    map.getSource('radius').setData(EMPTY);
+                }
+            }
+ 
+            showEvents(filtered);
+            if (!filtered.length) showToast('No events match these filters', 'info');
+        }
+ 
+        // ============ Wire up controls ============
         document.querySelectorAll('.filter-chip').forEach(chip => {
             chip.addEventListener('click', () => {
                 document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
                 chip.classList.add('active');
-                activeFilter = chip.dataset.category;
-
-                const filtered = activeFilter === 'all'
-                    ? EVENTS_DATA
-                    : EVENTS_DATA.filter(e => e.category === activeFilter);
-                createMarkers(filtered);
+                state.category = chip.dataset.category;
+                applyFilters();
             });
         });
-
-        // Search
+ 
         document.getElementById('map-search-input').addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            const filtered = EVENTS_DATA.filter(ev =>
-                (activeFilter === 'all' || ev.category === activeFilter) &&
-                (ev.title.toLowerCase().includes(query) ||
-                    ev.city.toLowerCase().includes(query) ||
-                    ev.organizer.toLowerCase().includes(query))
-            );
-            createMarkers(filtered);
+            state.query = e.target.value;
+            applyFilters();
         });
-
+ 
+        document.getElementById('date-select').addEventListener('change', (e) => {
+            state.date = e.target.value;
+            applyFilters();
+        });
+ 
+        document.getElementById('radius-select').addEventListener('change', async (e) => {
+            state.radius = Number(e.target.value);
+            if (state.radius) {
+                const loc = await getUserLocation();
+                if (loc.isFallback) showToast('Location unavailable — measuring from New Delhi', 'info');
+                state.origin = loc;
+            }
+            applyFilters(true);
+        });
+ 
+        document.getElementById('saved-toggle').addEventListener('click', (e) => {
+            state.savedOnly = !state.savedOnly;
+            e.currentTarget.classList.toggle('is-active', state.savedOnly);
+            applyFilters();
+        });
+ 
         // Near Me / Locate
+        let userMarker = null;
         async function centerOnUser() {
             try {
                 const loc = await getUserLocation();
-                map.flyTo([loc.lat, loc.lng], 12, { duration: 1.5 });
-
-                // Add user marker
-                const userIcon = L.divIcon({
-                    className: 'user-loc',
-                    html: `<div style="width:14px;height:14px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 15px #3b82f699;"></div>`,
-                    iconSize: [14, 14]
-                });
-                L.marker([loc.lat, loc.lng], { icon: userIcon }).addTo(map)
-                    .bindPopup('<b>You are here</b>').openPopup();
-
-                showToast('📍 Location found!');
+                map.flyTo({ center: [loc.lng, loc.lat], zoom: 11.5, duration: 1500 });
+ 
+                const dot = document.createElement('div');
+                dot.style.cssText = 'width:14px;height:14px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 15px #3b82f699;';
+                if (userMarker) userMarker.remove();
+                userMarker = new mapboxgl.Marker({ element: dot })
+                    .setLngLat([loc.lng, loc.lat])
+                    .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML('<b>You are here</b>'))
+                    .addTo(map);
+                userMarker.togglePopup();
+ 
+                showToast(loc.isFallback ? 'Using New Delhi as your location' : '📍 Location found!', loc.isFallback ? 'info' : 'success');
             } catch {
                 showToast('Could not get location', 'info');
             }
         }
-
+ 
         document.getElementById('locate-btn').addEventListener('click', centerOnUser);
         document.getElementById('near-me-btn').addEventListener('click', centerOnUser);
+ 
+        // ============ Initial render ============
+        setSaved(getSaved());           // sets the saved counter
+        document.getElementById('visible-count').textContent = EVENTS.length;
+ 
+        // Shared link: map.html?event=3 opens that event's popup
+        let deepDone = false;
+        function openDeepLinkOnce() {
+            if (deepDone) return;
+            deepDone = true;
+            const deepId = new URLSearchParams(location.search).get('event');
+            if (!deepId) return;
+            const ev = EVENTS.find(x => String(x.id) === deepId);
+            if (!ev) return;
+            const go = () => {
+                map.flyTo({ center: [ev.lng, ev.lat], zoom: 12, duration: 1500 });
+                map.once('moveend', () => openEventPopup(ev));
+            };
+            mapReady ? go() : map.once('load', go);
+        }
+ 
+        // Called by the Firestore script below whenever events change
+        window.setEvents = (list) => {
+            EVENTS = list;
+            applyFilters();
+            openDeepLinkOnce();
+        };
+        window.openDeepLinkOnce = openDeepLinkOnce;
+        setTimeout(openDeepLinkOnce, 4000);   // if live data never arrives
+ 
+        // Status message so you can tell if the database connection works
+        window.__liveLoaded = false;
+        setTimeout(() => {
+            if (!window.__liveLoaded) {
+                console.warn('Live data did not load — showing demo events. Check js/firebase.js and the Console.');
+                showToast('⚠️ Not connected to database — showing demo events', 'info');
+            }
+        }, 5000);
+    </script>
+ 
+    <!-- Live events from Firestore (only "approved" events are shown) -->
+    <script type="module">
+        import { db } from './js/firebase.js';
+        import { collection, query, where, onSnapshot }
+            from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ 
+        const q = query(collection(db, 'events'), where('status', '==', 'approved'));
+        onSnapshot(q, (snap) => {
+            const list = snap.docs.map(d => ({ ...d.data(), id: d.data().id ?? d.id }));
+            if (!list.length) return;          // database empty -> keep demo events
+            window.__liveLoaded = true;
+            showToast('✅ Live data connected (' + list.length + ' events)');
+            window.setEvents(list);
+        }, (err) => {
+            console.error('Firestore error:', err);
+            showToast('Live data unavailable — showing demo events', 'info');
+            window.openDeepLinkOnce();
+        });
     </script>
 </body>
-
+ 
 </html>

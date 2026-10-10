@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-
+ 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,38 +9,85 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/navbar.css">
     <link rel="stylesheet" href="css/event-detail.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+    <style>
+        /* Smooth map: no blur layers behind the moving map */
+        .detail-section, .detail-section.glass-card, .detail-map-wrap {
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+        }
+        .detail-section.glass-card { background: var(--bg-secondary) !important; }
+        #detail-map { transform: translateZ(0); }
+    </style>
 </head>
-
+ 
 <body>
     <div class="ambient-bg"></div>
     <div id="navbar-root"></div>
-
+ 
     <div class="detail-page" id="detail-page">
-        <!-- Populated by JS -->
+        <div class="container" style="padding: 4rem 0; text-align: center; color: var(--text-secondary);">
+            Loading event...
+        </div>
     </div>
-
+ 
     <div id="footer-root"></div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+ 
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <script src="js/maptiles.js"></script>
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
+    <script type="module" src="js/notifications.js"></script>
+    <script type="module" src="js/i18n.js"></script>
     <script>
         document.getElementById('navbar-root').innerHTML = getNavbarHTML('events');
         document.getElementById('footer-root').innerHTML = getFooterHTML();
-
-        const params = new URLSearchParams(window.location.search);
-        const eventId = parseInt(params.get('id'), 10);
-        const event = EVENTS_DATA.find(e => e.id === eventId) || EVENTS_DATA[0];
-        const cat = CATEGORIES[event.category];
-        const pct = Math.min(100, Math.round((event.volunteersJoined / event.volunteersNeeded) * 100));
-
-        document.title = `${event.title} — SERVEO`;
-
-        document.getElementById('detail-page').innerHTML = `
+    </script>
+ 
+    <script type="module">
+        import { getApprovedEvent, safeEvent, joinEvent } from './js/db.js';
+ 
+        const eventId = new URLSearchParams(window.location.search).get('id') || '1';
+        const page = document.getElementById('detail-page');
+ 
+        // ----- load the event (Firestore first, demo data as a fallback) -----
+        let event = null;
+        try {
+            const live = await getApprovedEvent(eventId);
+            if (live) event = safeEvent(live);
+        } catch (err) {
+            console.error('Firestore error:', err);
+        }
+        if (!event) {
+            event = EVENTS_DATA.find(e => String(e.id) === String(eventId)) || null;
+        }
+ 
+        if (!event) {
+            page.innerHTML = `
+              <div class="container" style="padding: 4rem 0; text-align: center;">
+                <h2>Event not found</h2>
+                <p style="margin: 1rem 0">This event may have ended or is waiting for approval.</p>
+                <a href="events.html" class="btn btn-primary">← Back to Events</a>
+              </div>`;
+        } else {
+            render(event);
+        }
+ 
+        function render(event) {
+            const cat = CATEGORIES[event.category] || CATEGORIES.blood;
+            const pct = () => Math.min(100, Math.round((event.volunteersJoined / event.volunteersNeeded) * 100));
+            const joinedKey = 'serveo_joined';
+            const getJoined = () => { try { return JSON.parse(localStorage.getItem(joinedKey) || '[]').map(String); } catch { return []; } };
+            const alreadyJoined = getJoined().includes(String(event.id));
+ 
+            const decoder = document.createElement('textarea');   // safely turns &amp; back into &
+            decoder.innerHTML = event.title;
+            document.title = `${decoder.value} — SERVEO`;
+ 
+            page.innerHTML = `
       <div class="detail-hero" style="background: linear-gradient(180deg, ${cat.color}22, transparent 70%)">
         <div class="container">
           <a href="events.html" class="detail-back">← Back to Events</a>
@@ -56,14 +103,14 @@
           <p class="detail-org-line">Organized by <strong>${event.organizer}</strong></p>
         </div>
       </div>
-
+ 
       <div class="container detail-body">
         <div class="detail-main">
           <div class="glass-card detail-section">
             <h3>About this event</h3>
             <p>${event.description}</p>
           </div>
-
+ 
           <div class="glass-card detail-section">
             <h3>Location</h3>
             <p class="detail-address">📍 ${event.address}</p>
@@ -71,19 +118,19 @@
               <div id="detail-map"></div>
             </div>
           </div>
-
+ 
           <div class="glass-card detail-section">
             <h3>Organizer</h3>
             <div class="detail-organizer-row">
               <div class="detail-org-avatar">🏥</div>
               <div>
                 <p class="detail-org-name">${event.organizer} ${event.verified ? '<span class="mini-verified">✓ Verified</span>' : ''}</p>
-                <p class="detail-org-sub">Trusted organizer on SERVEO</p>
+                <p class="detail-org-sub">${event.verified ? 'Trusted organizer on SERVEO' : 'Organizer on SERVEO'}</p>
               </div>
             </div>
           </div>
         </div>
-
+ 
         <aside class="detail-sidebar">
           <div class="glass-card detail-action-card">
             <div class="detail-meta-list">
@@ -91,46 +138,77 @@
               <div class="detail-meta-row"><span>🕐 Time</span><strong>${formatEventTime(event)}</strong></div>
               <div class="detail-meta-row"><span>📍 City</span><strong>${event.city}</strong></div>
             </div>
-
-            ${volunteerProgressHTML(event)}
-            <p class="detail-pct">${pct}% of volunteer goal reached</p>
-
+ 
+            <div id="progress-wrap">${volunteerProgressHTML(event)}</div>
+            <p class="detail-pct" id="pct-text">${pct()}% of volunteer goal reached</p>
+ 
             <div class="detail-actions">
-              <button class="btn btn-primary btn-lg" id="rsvp-btn">🙋 Volunteer for this Event</button>
+              <button class="btn btn-primary btn-lg" id="rsvp-btn" ${alreadyJoined ? 'disabled' : ''}>${alreadyJoined ? '✓ You\'re registered' : '🙋 Volunteer for this Event'}</button>
               ${event.donationLink ? `<button class="btn btn-secondary btn-lg" id="donate-btn">💛 Donate to Support</button>` : ''}
-              <a href="${getDirectionsURL(event.lat, event.lng)}" target="_blank" class="btn btn-outline btn-lg">🧭 Get Directions</a>
+              <a href="${getDirectionsURL(event.lat, event.lng)}" target="_blank" rel="noopener" class="btn btn-outline btn-lg">🧭 Get Directions</a>
             </div>
-
+ 
             <button class="detail-share" id="share-btn">🔗 Share this event</button>
           </div>
         </aside>
       </div>
     `;
-
-        setTimeout(() => {
-            const map = L.map('detail-map', { zoomControl: true, attributionControl: false })
-                .setView([event.lat, event.lng], 14);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-            const icon = L.divIcon({
-                className: 'custom-marker-wrap',
-                html: `<div class="custom-marker" style="background:${cat.color}"><span>${cat.icon}</span></div>`,
-                iconSize: [34, 34], iconAnchor: [17, 17]
+ 
+            // Map (Mapbox GL: smooth like Google Maps)
+            try {
+                const map = serveoCreateMap('detail-map', { center: [event.lng, event.lat], zoom: 14 });
+                map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+                const pin = document.createElement('div');
+                pin.className = 'custom-marker-wrap';
+                pin.innerHTML = `<div class="custom-marker" style="background:${cat.color}"><span>${cat.icon}</span></div>`;
+                new mapboxgl.Marker({ element: pin }).setLngLat([event.lng, event.lat]).addTo(map);
+            } catch (err) { console.error(err); }
+ 
+            // Volunteer
+            const rsvp = document.getElementById('rsvp-btn');
+            rsvp.addEventListener('click', async () => {
+                rsvp.disabled = true;
+                try {
+                    await joinEvent(event.id);
+                } catch (err) {
+                    console.error(err);
+                    // demo events / no connection: still confirm locally
+                }
+                event.volunteersJoined += 1;
+                document.getElementById('progress-wrap').innerHTML = volunteerProgressHTML(event);
+                document.getElementById('pct-text').textContent = `${pct()}% of volunteer goal reached`;
+                try {
+                    const list = getJoined(); list.push(String(event.id));
+                    localStorage.setItem(joinedKey, JSON.stringify(list));
+                } catch { }
+                rsvp.textContent = '✓ You\'re registered';
+                showToast('🎉 You\'re registered! The organizer will be in touch.');
             });
-            L.marker([event.lat, event.lng], { icon }).addTo(map);
-        }, 100);
-
-        document.getElementById('rsvp-btn').addEventListener('click', () => {
-            showToast('🎉 You\'re registered! The organizer will be in touch.');
-        });
-
-        document.getElementById('donate-btn')?.addEventListener('click', () => {
-            showToast('💛 Redirecting to a secure UPI payment...', 'info');
-        });
-
-        document.getElementById('share-btn').addEventListener('click', () => {
-            showToast('🔗 Link copied to clipboard!', 'info');
-        });
+ 
+            // Donate (only upi:// or https:// links are accepted)
+            document.getElementById('donate-btn')?.addEventListener('click', () => {
+                const link = String(event.donationLink || '');
+                if (/^(upi:\/\/|https:\/\/)/i.test(link)) {
+                    showToast('💛 Opening payment...', 'info');
+                    window.location.href = link;
+                } else {
+                    showToast('Donation link is not available', 'info');
+                }
+            });
+ 
+            // Share (copies a link that opens this event's page)
+            document.getElementById('share-btn').addEventListener('click', async () => {
+                const url = location.href;
+                try {
+                    await navigator.clipboard.writeText(url);
+                    showToast('🔗 Link copied to clipboard!', 'info');
+                } catch {
+                    window.prompt('Copy this link:', url);
+                }
+            });
+        }
     </script>
 </body>
-
+ 
 </html>
+ 

@@ -1,6 +1,7 @@
+
 <!DOCTYPE html>
 <html lang="en">
-
+ 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,12 +13,25 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+    <style>
+        /* Pending approval queue */
+        .pending-list { display: grid; gap: var(--space-md); }
+        .pending-card { padding: var(--space-lg); cursor: default; }
+        .pending-top { display: flex; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
+        .pending-card h3 { margin-bottom: 4px; }
+        .pending-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--text-secondary); margin: 8px 0; }
+        .pending-desc { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px; }
+        .pending-contact { font-size: 0.85rem; margin-bottom: 12px; }
+        .pending-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pending-empty { padding: var(--space-lg); color: var(--text-secondary); text-align: center; }
+        .pending-count { background: var(--accent-primary); color: #06231d; border-radius: 999px; padding: 2px 10px; font-size: 0.8rem; font-weight: 700; margin-left: 8px; }
+    </style>
 </head>
-
+ 
 <body>
     <div class="ambient-bg"></div>
     <div id="navbar-root"></div>
-
+ 
     <div class="organizer-page">
         <!-- Header -->
         <div class="organizer-header">
@@ -32,7 +46,7 @@
                 </div>
             </div>
         </div>
-
+ 
         <div class="container">
             <!-- Dashboard Stats -->
             <div class="dash-stats">
@@ -53,14 +67,24 @@
                     <div class="dash-stat-label">Trust Score</div>
                 </div>
             </div>
-
+ 
+            <!-- Pending approval (new events submitted from "Post an Event") -->
+            <div class="dash-section">
+                <div class="dash-section-header">
+                    <h2>🕐 Waiting for Approval <span class="pending-count" id="pending-count">0</span></h2>
+                </div>
+                <div class="pending-list" id="pending-list">
+                    <div class="pending-empty glass-card">Loading...</div>
+                </div>
+            </div>
+ 
             <!-- Event Management -->
             <div class="dash-section">
                 <div class="dash-section-header">
                     <h2>📋 Your Events</h2>
                     <a href="post-event.html" class="btn btn-primary btn-sm">+ New Event</a>
                 </div>
-
+ 
                 <table class="events-table">
                     <thead>
                         <tr>
@@ -140,7 +164,7 @@
                     </tbody>
                 </table>
             </div>
-
+ 
             <!-- Quick Actions -->
             <div class="dash-section" style="display:flex; gap: var(--space-lg); flex-wrap: wrap;">
                 <div class="glass-card" style="flex:1; min-width:280px; padding: var(--space-xl); cursor:default;">
@@ -165,15 +189,110 @@
             </div>
         </div>
     </div>
-
+ 
     <div id="footer-root"></div>
-
+ 
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
     <script>
         document.getElementById('navbar-root').innerHTML = getNavbarHTML('');
         document.getElementById('footer-root').innerHTML = getFooterHTML();
     </script>
+ 
+    <!-- Approval queue (built with textContent, so submitted text can never run as code) -->
+    <script type="module">
+        import { watchPending, getContact, setEventStatus, removeEvent } from './js/db.js';
+        import { broadcastNewEvent } from './js/notifications.js';
+ 
+        const list = document.getElementById('pending-list');
+        const countEl = document.getElementById('pending-count');
+ 
+        function el(tag, className, text) {
+            const n = document.createElement(tag);
+            if (className) n.className = className;
+            if (text !== undefined) n.textContent = text;
+            return n;
+        }
+ 
+        function actionButton(label, className, handler) {
+            const b = el('button', 'btn btn-sm ' + className, label);
+            b.addEventListener('click', async () => {
+                b.disabled = true;
+                try { await handler(); }
+                catch (err) {
+                    b.disabled = false;
+                    if (err.message === 'cancelled') return;
+                    console.error(err); showToast('Action failed — try again', 'info');
+                }
+            });
+            return b;
+        }
+ 
+        async function buildCard(ev) {
+            const cat = CATEGORIES[ev.category];
+            const card = el('div', 'pending-card glass-card');
+ 
+            const top = el('div', 'pending-top');
+            const left = el('div');
+            left.append(el('span', 'badge badge-upcoming', (cat ? cat.icon + ' ' + cat.label : ev.category)));
+            left.append(el('h3', '', ev.title));
+            left.append(el('div', '', 'by ' + ev.organizer));
+            top.append(left);
+            card.append(top);
+ 
+            const meta = el('div', 'pending-meta');
+            meta.append(
+                el('span', '', '📅 ' + ev.date + ', ' + ev.startTime + ' – ' + ev.endTime),
+                el('span', '', '📍 ' + ev.address + ' (' + ev.city + ')'),
+                el('span', '', '🙋 ' + ev.volunteersNeeded + ' volunteers needed')
+            );
+            card.append(meta);
+            card.append(el('p', 'pending-desc', ev.description));
+ 
+            const c = await getContact(ev._docId);
+            const contact = el('div', 'pending-contact',
+                c ? '📞 ' + c.contact + '  ·  ✉️ ' + c.email + (c.orgType ? '  ·  ' + c.orgType : '')
+                  : 'No contact details found');
+            card.append(contact);
+ 
+            const actions = el('div', 'pending-actions');
+            actions.append(
+                actionButton('✓ Approve', 'btn-primary', async () => {
+                    await setEventStatus(ev._docId, { status: 'approved' });
+                    broadcastNewEvent({ ...ev, status: 'approved' });
+                    showToast('Event approved & 0-5km nearby alert sent');
+                }),
+                actionButton('✓ Approve + Verified badge', 'btn-secondary', async () => {
+                    await setEventStatus(ev._docId, { status: 'approved', verified: true });
+                    broadcastNewEvent({ ...ev, status: 'approved', verified: true });
+                    showToast('Approved with verified badge & alert sent');
+                }),
+                actionButton('✗ Reject', 'btn-secondary', async () => {
+                    await setEventStatus(ev._docId, { status: 'rejected' });
+                    showToast('Event rejected', 'info');
+                }),
+                actionButton('🗑 Delete', 'btn-secondary', async () => {
+                    if (!confirm('Delete this event permanently?')) throw new Error('cancelled');
+                    await removeEvent(ev._docId);
+                })
+            );
+            card.append(actions);
+            return card;
+        }
+ 
+        watchPending(async (events) => {
+            countEl.textContent = events.length;
+            if (!events.length) {
+                list.replaceChildren(el('div', 'pending-empty glass-card', 'No events waiting for approval 🎉'));
+                return;
+            }
+            const cards = await Promise.all(events.map(buildCard));
+            list.replaceChildren(...cards);
+        }, (err) => {
+            console.error(err);
+            list.replaceChildren(el('div', 'pending-empty glass-card', 'Could not load pending events.'));
+        });
+    </script>
 </body>
-
+ 
 </html>

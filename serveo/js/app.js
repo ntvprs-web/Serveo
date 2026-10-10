@@ -3,16 +3,37 @@
    ============================================ */
 function getNavbarHTML(active) {
   const links = [
-    { id: 'home', href: 'index.html', label: 'Home' },
-    { id: 'map', href: 'map.html', label: 'Live Map' },
-    { id: 'events', href: 'events.html', label: 'Events' },
-    { id: 'impact', href: 'impact.html', label: 'Impact' },
-    { id: 'about', href: 'about.html', label: 'About' },
+    { id: 'home', href: 'index.html', label: 'Home', i18n: 'nav_home' },
+    { id: 'map', href: 'map.html', label: 'Live Map', i18n: 'nav_map' },
+    { id: 'events', href: 'events.html', label: 'Events', i18n: 'nav_events' },
+    { id: 'impact', href: 'impact.html', label: 'Impact', i18n: 'nav_impact' },
+    { id: 'about', href: 'about.html', label: 'About', i18n: 'nav_about' },
   ];
 
+  const currentLang = (typeof localStorage !== 'undefined' && localStorage.getItem('serveo_language')) || 'en';
+
   const linksHTML = links.map(l =>
-    `<a href="${l.href}" class="${active === l.id ? 'active' : ''}">${l.label}</a>`
+    `<a href="${l.href}" class="${active === l.id ? 'active' : ''}" data-i18n="${l.i18n}">${l.label}</a>`
   ).join('');
+
+  const langSelectorHTML = `
+    <div class="lang-selector-wrap">
+      <select id="serveo-lang-select" class="lang-select" title="Choose Indian Language / भाषा चुनें">
+        <option value="en" ${currentLang === 'en' ? 'selected' : ''}>🇮🇳 English</option>
+        <option value="hi" ${currentLang === 'hi' ? 'selected' : ''}>🇮🇳 हिंदी (Hindi)</option>
+        <option value="bn" ${currentLang === 'bn' ? 'selected' : ''}>🇮🇳 বাংলা (Bengali)</option>
+        <option value="te" ${currentLang === 'te' ? 'selected' : ''}>🇮🇳 తెలుగు (Telugu)</option>
+        <option value="mr" ${currentLang === 'mr' ? 'selected' : ''}>🇮🇳 मराठी (Marathi)</option>
+        <option value="ta" ${currentLang === 'ta' ? 'selected' : ''}>🇮🇳 தமிழ் (Tamil)</option>
+        <option value="gu" ${currentLang === 'gu' ? 'selected' : ''}>🇮🇳 ગુજરાતી (Gujarati)</option>
+        <option value="kn" ${currentLang === 'kn' ? 'selected' : ''}>🇮🇳 ಕನ್ನಡ (Kannada)</option>
+        <option value="ml" ${currentLang === 'ml' ? 'selected' : ''}>🇮🇳 മലയാളം (Malayalam)</option>
+        <option value="pa" ${currentLang === 'pa' ? 'selected' : ''}>🇮🇳 ਪੰਜਾਬੀ (Punjabi)</option>
+        <option value="ur" ${currentLang === 'ur' ? 'selected' : ''}>🇮🇳 اردو (Urdu)</option>
+        <option value="or" ${currentLang === 'or' ? 'selected' : ''}>🇮🇳 ଓଡ଼ିଆ (Odia)</option>
+      </select>
+    </div>
+  `;
 
   return `
     <nav class="navbar">
@@ -23,8 +44,13 @@ function getNavbarHTML(active) {
         </a>
         <div class="navbar-links" id="navbar-links">${linksHTML}</div>
         <div class="navbar-actions">
-          <a href="organizer.html" class="btn btn-secondary btn-sm">Organizer Login</a>
-          <a href="post-event.html" class="btn btn-primary btn-sm">Post an Event</a>
+          ${langSelectorHTML}
+          <button id="notif-toggle-btn" class="btn btn-secondary btn-sm" title="0–5 km Nearby Alert Status" style="display:inline-flex;align-items:center;gap:6px;">
+            <span class="nearby-pulse-dot" style="display:inline-block"></span>
+            <span data-i18n="nav_alerts">🔔 0–5km Alerts</span>
+          </button>
+          <a href="organizer.html" class="btn btn-secondary btn-sm" data-i18n="nav_organizer">Organizer Login</a>
+          <a href="post-event.html" class="btn btn-primary btn-sm" data-i18n="nav_post_event">Post an Event</a>
           <button class="navbar-toggle" id="navbar-toggle" aria-label="Toggle menu">☰</button>
         </div>
       </div>
@@ -172,4 +198,30 @@ function initCounters() {
 document.addEventListener('DOMContentLoaded', () => {
   initScrollReveal();
   initCounters();
+
+  // Wire up 0-5km alerts button in navbar
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#notif-toggle-btn');
+    if (!btn) return;
+
+    if ('Notification' in window && Notification.permission !== 'granted') {
+      try {
+        await Notification.requestPermission();
+      } catch (err) {}
+    }
+
+    // Trigger test nearby alert so user can see directions and volunteer flow immediately
+    if (typeof window.triggerDemoNearbyAlert === 'function') {
+      window.triggerDemoNearbyAlert();
+    } else {
+      import('./notifications.js').then(m => m.triggerDemoNearbyAlert());
+    }
+  });
+
+  // Register PWA Service Worker for offline performance
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
 });

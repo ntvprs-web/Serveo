@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SERVEO — Seed database</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#0b0f19;color:#e5e7eb;display:grid;place-items:center;min-height:100vh;margin:0}
+    .box{max-width:460px;padding:2rem;background:#141924;border:1px solid #2a3142;border-radius:14px;text-align:center}
+    button{padding:.8rem 1.4rem;border:0;border-radius:10px;background:#00d4aa;color:#06231d;font-weight:700;font-size:1rem;cursor:pointer}
+    button:disabled{opacity:.5;cursor:default}
+    #log{margin-top:1rem;font-size:.9rem;color:#9ca3af;white-space:pre-line}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>Upload starter events</h2>
+    <p>Copies the 18 events from <code>data.js</code> into Firestore (collection <code>events</code>). Safe to run again — it overwrites the same documents.</p>
+    <button id="go">Upload events</button>
+    <div id="log"></div>
+  </div>
+ 
+  <script src="js/data.js"></script>
+  <script type="module">
+    import { db } from './js/firebase.js';
+    import { doc, setDoc, serverTimestamp }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+ 
+    const btn = document.getElementById('go'), log = document.getElementById('log');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; log.textContent = 'Uploading...';
+      try {
+        let n = 0;
+        for (const ev of EVENTS_DATA) {
+          await setDoc(doc(db, 'events', String(ev.id)), { ...ev, status: 'approved', createdAt: serverTimestamp() });
+          n++; log.textContent = `Uploaded ${n} / ${EVENTS_DATA.length}`;
+        }
+        log.textContent = `✅ Done — ${n} events are in Firestore. You can delete seed.html now.`;
+      } catch (e) {
+        console.error(e);
+        log.textContent = '❌ Failed: ' + e.message + '\n(Check the Firestore rules are in test mode.)';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
+ 

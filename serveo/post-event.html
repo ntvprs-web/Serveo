@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-
+ 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,16 +10,34 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/navbar.css">
     <link rel="stylesheet" href="css/post-event.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+    <style>
+        /* Smooth map: a blurred "glass" card behind a moving map makes zooming very laggy */
+        .form-card, .form-card.glass-card, .map-picker {
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+        }
+        .form-card.glass-card { background: var(--bg-secondary) !important; }
+        #picker-map { transform: translateZ(0); }
+        .picker-tools { display: flex; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+        .picker-tools .form-control { flex: 1; min-width: 220px; }
+        .place-results { display: grid; gap: 4px; margin-bottom: 4px; }
+        .place-results button {
+            text-align: left; padding: 0.55rem 0.8rem; border-radius: 8px; cursor: pointer;
+            background: rgba(255,255,255,0.04); border: 1px solid var(--border-color);
+            color: var(--text-primary); font-size: 0.85rem;
+        }
+        .place-results button:hover { border-color: var(--accent-primary); }
+    </style>
 </head>
-
+ 
 <body>
     <div class="ambient-bg"></div>
     <div id="navbar-root"></div>
-
+ 
     <div class="form-page">
         <div class="form-header">
             <div class="container">
@@ -27,18 +45,18 @@
                 <p>Publish your community welfare initiative and reach thousands of local volunteers instantly.</p>
             </div>
         </div>
-
+ 
         <div class="container form-container">
             <!-- Success Message -->
             <div class="form-success glass-card" id="form-success">
                 <div class="success-icon">🎉</div>
                 <h2>Event Submitted Successfully!</h2>
-                <p>Your event is being reviewed by our team and will appear on the map within 24 hours. You'll receive
-                    confirmation at the provided email address.</p>
+                <p>Your event is being reviewed by our team and will appear on the map once it is approved. We may
+                    contact you at the phone number or email you provided.</p>
                 <br>
                 <a href="events.html" class="btn btn-primary">Browse Events</a>
             </div>
-
+ 
             <!-- Form -->
             <form class="form-card glass-card" id="event-form">
                 <!-- Category -->
@@ -82,18 +100,18 @@
                         </label>
                     </div>
                 </div>
-
+ 
                 <!-- Basic Info -->
                 <div class="form-section">
                     <h3 class="form-section-title">📝 Event Details</h3>
                     <div class="form-group">
                         <label for="event-title">Event Title *</label>
-                        <input type="text" class="form-control" id="event-title"
+                        <input type="text" class="form-control" id="event-title" maxlength="120"
                             placeholder="e.g., Emergency Blood Donation Camp" required>
                     </div>
                     <div class="form-group">
                         <label for="event-desc">Description *</label>
-                        <textarea class="form-control" id="event-desc"
+                        <textarea class="form-control" id="event-desc" maxlength="1500"
                             placeholder="Describe the event, what volunteers should expect, requirements, etc."
                             required></textarea>
                     </div>
@@ -105,7 +123,7 @@
                         <div class="form-group">
                             <label for="volunteers-needed">Volunteers Needed</label>
                             <input type="number" class="form-control" id="volunteers-needed" placeholder="e.g., 50"
-                                min="1">
+                                min="1" max="100000">
                         </div>
                     </div>
                     <div class="form-row">
@@ -119,24 +137,26 @@
                         </div>
                     </div>
                 </div>
-
+ 
                 <!-- Location -->
                 <div class="form-section">
                     <h3 class="form-section-title">📍 Location</h3>
                     <div class="form-group">
                         <label for="event-address">Full Address *</label>
-                        <input type="text" class="form-control" id="event-address"
+                        <input type="text" class="form-control" id="event-address" maxlength="250"
                             placeholder="e.g., Red Cross Bhawan, Parliament Street, New Delhi" required>
+                        <p class="form-help" id="addr-status"></p>
+                        <div class="place-results" id="addr-matches"></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="event-city">City *</label>
-                            <input type="text" class="form-control" id="event-city" placeholder="e.g., New Delhi"
-                                required>
+                            <input type="text" class="form-control" id="event-city" maxlength="80"
+                                placeholder="e.g., New Delhi" required>
                         </div>
                         <div class="form-group">
-                            <label>Pin Location on Map</label>
-                            <p class="form-help">Click on the map to set the exact event location.</p>
+                            <label>Pin Location on Map *</label>
+                            <p class="form-help">Set automatically from the address. Drag the pin to adjust.</p>
                         </div>
                     </div>
                     <div class="map-picker">
@@ -153,13 +173,13 @@
                         </div>
                     </div>
                 </div>
-
+ 
                 <!-- Organizer -->
                 <div class="form-section">
                     <h3 class="form-section-title">🏢 Organizer Information</h3>
                     <div class="form-group">
                         <label for="org-name">Organization / Organizer Name *</label>
-                        <input type="text" class="form-control" id="org-name"
+                        <input type="text" class="form-control" id="org-name" maxlength="120"
                             placeholder="e.g., Indian Red Cross Society" required>
                     </div>
                     <div class="form-row">
@@ -193,31 +213,32 @@
                         <p class="form-help">Add a verified UPI or payment link for supporters to donate directly.</p>
                     </div>
                 </div>
-
+ 
                 <!-- Submit -->
                 <div class="form-checkbox">
                     <input type="checkbox" id="terms" required>
                     <label for="terms">I confirm that this is a genuine, non-commercial public welfare event. I
                         understand that fraudulent submissions will be reported and blocked.</label>
                 </div>
-
+ 
                 <div class="form-submit">
-                    <button type="submit" class="btn btn-primary btn-lg">📢 Submit Event for Review</button>
-                    <span class="form-help">Events are reviewed within 24 hours.</span>
+                    <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">📢 Submit Event for Review</button>
+                    <span class="form-help">Events are reviewed before they appear on the map.</span>
                 </div>
             </form>
         </div>
     </div>
-
+ 
     <div id="footer-root"></div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+ 
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <script src="js/maptiles.js"></script>
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
     <script>
         document.getElementById('navbar-root').innerHTML = getNavbarHTML('');
         document.getElementById('footer-root').innerHTML = getFooterHTML();
-
+ 
         // Category selection
         document.querySelectorAll('.category-option').forEach(opt => {
             opt.addEventListener('click', () => {
@@ -225,36 +246,181 @@
                 opt.classList.add('selected');
             });
         });
-
-        // Map picker
-        setTimeout(() => {
-            const pickerMap = L.map('picker-map').setView([22.5, 79], 5);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(pickerMap);
-
-            let pickerMarker = null;
-
-            pickerMap.on('click', (e) => {
-                const { lat, lng } = e.latlng;
-                document.getElementById('event-lat').value = lat.toFixed(6);
-                document.getElementById('event-lng').value = lng.toFixed(6);
-
-                if (pickerMarker) {
-                    pickerMarker.setLatLng(e.latlng);
-                } else {
-                    pickerMarker = L.marker(e.latlng).addTo(pickerMap);
+ 
+        // Don't allow dates in the past
+        document.getElementById('event-date').min = new Date().toISOString().slice(0, 10);
+ 
+        // ===== Location picker (Mapbox GL: smooth like Google Maps) =====
+        const pickerMap = serveoCreateMap('picker-map', { center: [79, 22.5], zoom: 4 });
+        pickerMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+        setTimeout(() => pickerMap.resize(), 300);
+ 
+        const latInput = document.getElementById('event-lat');
+        const lngInput = document.getElementById('event-lng');
+        const addressInput = document.getElementById('event-address');
+        const cityInput = document.getElementById('event-city');
+        let pinMarker = null;
+ 
+        // Remember whether the user typed the address/city themselves
+        [addressInput, cityInput].forEach(i => i.addEventListener('input', () => { i.dataset.auto = '0'; }));
+        function autoFill(input, value) {
+            if (value && (!input.value.trim() || input.dataset.auto === '1')) {
+                input.value = value;
+                input.dataset.auto = '1';
+            }
+        }
+ 
+        function setPin(lng, lat, opts = {}) {
+            latInput.value = lat.toFixed(6);
+            lngInput.value = lng.toFixed(6);
+ 
+            if (!pinMarker) {
+                pinMarker = new mapboxgl.Marker({ color: '#ef4444', draggable: true })
+                    .setLngLat([lng, lat]).addTo(pickerMap);
+                pinMarker.on('dragend', () => {
+                    const p = pinMarker.getLngLat();
+                    setPin(p.lng, p.lat);
+                });
+            } else {
+                pinMarker.setLngLat([lng, lat]);
+            }
+ 
+            if (opts.fly) pickerMap.flyTo({ center: [lng, lat], zoom: Math.max(pickerMap.getZoom(), 15), duration: 1200 });
+ 
+            // fill empty address / city automatically
+            if (!opts.skipLookup) {
+                serveoReverseGeocode(lng, lat).then(r => {
+                    if (!r) return;
+                    autoFill(addressInput, r.label);
+                    autoFill(cityInput, r.city);
+                }).catch(() => { });
+            }
+        }
+ 
+        // Click on the map to drop the pin
+        pickerMap.on('click', (e) => setPin(e.lngLat.lng, e.lngLat.lat));
+ 
+        // ===== Type the address -> the best match is pinned on the map automatically =====
+        const statusEl = document.getElementById('addr-status');
+        const matchesEl = document.getElementById('addr-matches');
+        let lookupTimer = null, lookupId = 0;
+ 
+        function pinPlace(p) {
+            setPin(p.lng, p.lat, { fly: true, skipLookup: true });
+            autoFill(cityInput, p.city);
+            statusEl.textContent = '📍 Pinned: ' + p.label;
+        }
+ 
+        async function lookupAddress() {
+            const address = addressInput.value.trim();
+            const city = cityInput.value.trim();
+            if (address.length < 4) { statusEl.textContent = ''; matchesEl.replaceChildren(); return; }
+ 
+            const myId = ++lookupId;
+            statusEl.textContent = 'Finding location...';
+            try {
+                const query = city && !address.toLowerCase().includes(city.toLowerCase()) ? address + ', ' + city : address;
+                const places = await serveoSearchPlaces(query);
+                if (myId !== lookupId) return;            // a newer search started
+ 
+                if (!places.length) {
+                    statusEl.textContent = 'Could not find this address. Add the city, or click the map to set the location.';
+                    matchesEl.replaceChildren();
+                    return;
                 }
-            });
-        }, 200);
-
-        // Form Submit
-        document.getElementById('event-form').addEventListener('submit', (e) => {
+ 
+                pinPlace(places[0]);                      // first match is selected automatically
+ 
+                // other possible matches, in case the first one is not right
+                matchesEl.replaceChildren(...places.slice(1).map(p => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.textContent = '📍 ' + p.label;
+                    b.addEventListener('click', () => { pinPlace(p); matchesEl.replaceChildren(); });
+                    return b;
+                }));
+            } catch (err) {
+                console.error(err);
+                if (myId === lookupId) statusEl.textContent = 'Location search is not available right now. Click the map to set the location.';
+            }
+        }
+ 
+        function scheduleLookup() {
+            clearTimeout(lookupTimer);
+            lookupTimer = setTimeout(lookupAddress, 700);
+        }
+        addressInput.addEventListener('input', scheduleLookup);
+        cityInput.addEventListener('input', scheduleLookup);
+    </script>
+ 
+    <!-- Save the event to Firestore (as "pending" until approved) -->
+    <script type="module">
+        import { addEvent } from './js/db.js';
+        import { broadcastNewEvent } from './js/notifications.js';
+ 
+        const form = document.getElementById('event-form');
+        const btn = document.getElementById('submit-btn');
+        const val = (id) => document.getElementById(id).value.trim();
+ 
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            document.getElementById('event-form').style.display = 'none';
-            document.getElementById('form-success').classList.add('show');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            showToast('🎉 Event submitted successfully!');
+ 
+            const category = form.querySelector('input[name="category"]:checked')?.value;
+            if (!category) return showToast('Please choose an event category', 'info');
+ 
+            const lat = parseFloat(val('event-lat')), lng = parseFloat(val('event-lng'));
+            if (Number.isNaN(lat) || Number.isNaN(lng))
+                return showToast('Please click on the map to pin the event location', 'info');
+ 
+            if (val('end-time') <= val('start-time'))
+                return showToast('End time must be after start time', 'info');
+ 
+            // Only allow safe payment links
+            let donationLink = val('donation-link') || null;
+            if (donationLink && !/^(upi:\/\/|https:\/\/)/i.test(donationLink)) {
+                return showToast('Donation link must start with upi:// or https://', 'info');
+            }
+ 
+            const category_ = CATEGORIES[category] ? category : 'blood';
+            const eventData = {
+                title: val('event-title'),
+                description: val('event-desc'),
+                category: category_,
+                date: val('event-date'),
+                startTime: val('start-time'),
+                endTime: val('end-time'),
+                volunteersNeeded: Math.max(1, parseInt(val('volunteers-needed'), 10) || 50),
+                address: val('event-address'),
+                city: val('event-city'),
+                lat, lng,
+                organizer: val('org-name'),
+                donationLink,
+                tags: [category_],
+            };
+            const contactData = {
+                orgType: val('org-type'),
+                contact: val('org-contact'),
+                email: val('org-email'),
+            };
+ 
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+            try {
+                const docId = await addEvent(eventData, contactData);
+                broadcastNewEvent({ ...eventData, id: docId });
+                form.style.display = 'none';
+                document.getElementById('form-success').classList.add('show');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                showToast('🎉 Event submitted & nearby 0-5km alert broadcasted!');
+            } catch (err) {
+                console.error(err);
+                showToast('Could not submit. Check your internet and try again.', 'info');
+                btn.disabled = false;
+                btn.textContent = '📢 Submit Event for Review';
+            }
         });
     </script>
 </body>
-
+ 
 </html>
+ 

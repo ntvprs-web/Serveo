@@ -1,6 +1,6 @@
-<!DOCTYPE html>
+html>
 <html lang="en">
-
+ 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,11 +14,11 @@
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
 </head>
-
+ 
 <body>
     <div class="ambient-bg"></div>
     <div id="navbar-root"></div>
-
+ 
     <div class="events-page">
         <!-- Header -->
         <div class="events-header">
@@ -27,7 +27,7 @@
                 <p>Discover community welfare initiatives happening across India right now.</p>
             </div>
         </div>
-
+ 
         <div class="container">
             <!-- Controls -->
             <div class="events-controls">
@@ -57,49 +57,52 @@
                     <span class="results-count"><span id="results-count">18</span> events</span>
                 </div>
             </div>
-
+ 
             <!-- Events Grid -->
             <div class="events-grid" id="events-grid"></div>
         </div>
     </div>
-
+ 
     <div id="footer-root"></div>
-
+ 
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
+    <script type="module" src="js/notifications.js"></script>
+    <script type="module" src="js/i18n.js"></script>
     <script>
         document.getElementById('navbar-root').innerHTML = getNavbarHTML('events');
         document.getElementById('footer-root').innerHTML = getFooterHTML();
-
+ 
         let currentCategory = 'all';
         let currentSearch = '';
         let currentSort = 'urgency';
-
+        let ALL_EVENTS = EVENTS_DATA;   // replaced by live Firestore events once they load
+ 
         // Urgency priority
         const urgencyOrder = { critical: 0, live: 1, ending: 2, upcoming: 3 };
-
+ 
         // Render events
         async function renderEvents() {
             const loc = userLocation || await getUserLocation();
-
-            let events = [...EVENTS_DATA];
-
+ 
+            let events = [...ALL_EVENTS];
+ 
             // Filter category
             if (currentCategory !== 'all') {
                 events = events.filter(e => e.category === currentCategory);
             }
-
+ 
             // Filter search
             if (currentSearch) {
                 const q = currentSearch.toLowerCase();
                 events = events.filter(e =>
-                    e.title.toLowerCase().includes(q) ||
-                    e.city.toLowerCase().includes(q) ||
-                    e.organizer.toLowerCase().includes(q) ||
-                    e.tags.some(t => t.includes(q))
+                    String(e.title).toLowerCase().includes(q) ||
+                    String(e.city).toLowerCase().includes(q) ||
+                    String(e.organizer).toLowerCase().includes(q) ||
+                    (e.tags || []).some(t => String(t).toLowerCase().includes(q))
                 );
             }
-
+ 
             // Sort
             switch (currentSort) {
                 case 'urgency':
@@ -120,7 +123,7 @@
                     );
                     break;
             }
-
+ 
             // Render
             const grid = document.getElementById('events-grid');
             if (events.length === 0) {
@@ -136,10 +139,10 @@
                     return eventCardHTML(e, dist);
                 }).join('');
             }
-
+ 
             document.getElementById('results-count').textContent = events.length;
         }
-
+ 
         // Category filters
         document.querySelectorAll('.filter-chip').forEach(chip => {
             chip.addEventListener('click', () => {
@@ -149,22 +152,38 @@
                 renderEvents();
             });
         });
-
+ 
         // Search
         document.getElementById('event-search').addEventListener('input', (e) => {
             currentSearch = e.target.value;
             renderEvents();
         });
-
+ 
         // Sort
         document.getElementById('sort-select').addEventListener('change', (e) => {
             currentSort = e.target.value;
             renderEvents();
         });
-
-        // Initial render
+ 
+        // Called by the Firestore script below whenever events change
+        window.setEvents = (list) => { ALL_EVENTS = list; renderEvents(); };
+ 
+        // Initial render (demo events show instantly; live events replace them)
         renderEvents();
     </script>
+ 
+    <!-- Live events from Firestore (only "approved" events are shown) -->
+    <script type="module">
+        import { watchApproved, safeEvent } from './js/db.js';
+ 
+        watchApproved((list) => {
+            if (!list.length) return;               // database empty -> keep demo events
+            window.setEvents(list.map(safeEvent));
+        }, (err) => {
+            console.error('Firestore error:', err);
+            showToast('Live data unavailable — showing demo events', 'info');
+        });
+    </script>
 </body>
-
+ 
 </html>

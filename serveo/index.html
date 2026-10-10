@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/navbar.css">
     <link rel="stylesheet" href="css/home.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css">
     <link rel="manifest" href="manifest.json">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
@@ -27,7 +27,7 @@
             <div class="hero-text">
                 <div class="hero-badge">38 Events Live Across India Right Now</div>
                 <h1 class="hero-title">
-                    <span>Discover. Serve.</span>
+                    <span>Discover. Serveo.</span>
                     <span class="gradient-text">Save Lives.</span>
                 </h1>
                 <p class="hero-subtitle">
@@ -216,43 +216,34 @@
     <div id="footer-root"></div>
  
     <!-- Scripts -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <script src="js/maptiles.js"></script>
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
+    <script type="module" src="js/notifications.js"></script>
+    <script type="module" src="js/i18n.js"></script>
     <script>
         // Inject shared nav & footer
         document.getElementById('navbar-root').innerHTML = getNavbarHTML('home');
         document.getElementById('footer-root').innerHTML = getFooterHTML();
  
-        // Hero mini-map
+        // Hero mini-map (Mapbox GL, not interactive)
         document.addEventListener('DOMContentLoaded', () => {
-            const heroMap = L.map('hero-map', {
-                zoomControl: false, attributionControl: false,
-                dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
-                touchZoom: false, keyboard: false
-            }).setView([22.5, 79], 5);
- 
-            // ===== API KEY: paste your Mapbox public token (starts with "pk.") below =====
-            const MAPBOX_TOKEN = 'pk.eyJ1IjoibmlzaGFudDIyIiwiYSI6ImNtdXo4cnAwZDBjMGcyenM5cWdqc2pmaDcifQ.q50Yt3xBnL3EEF1-6c6O0g';
- 
-            L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
-                tileSize: 512,
-                zoomOffset: -1,
-                maxZoom: 19
-            }).addTo(heroMap);
+            let heroMap;
+            try {
+                heroMap = serveoCreateMap('hero-map', { center: [79, 22.5], zoom: 3.7, interactive: false });
+            } catch (err) { console.error(err); return; }
  
             // Add event markers
             EVENTS_DATA.forEach(event => {
                 const cat = CATEGORIES[event.category];
-                const icon = L.divIcon({
-                    className: 'hero-marker',
-                    html: `<div style="background:${cat.color}; width:10px; height:10px; border-radius:50%; box-shadow:0 0 8px ${cat.color}88;"></div>`,
-                    iconSize: [10, 10]
-                });
-                L.marker([event.lat, event.lng], { icon }).addTo(heroMap);
+                const dot = document.createElement('div');
+                dot.style.cssText = `background:${cat.color}; width:10px; height:10px; border-radius:50%; box-shadow:0 0 8px ${cat.color}88;`;
+                new mapboxgl.Marker({ element: dot }).setLngLat([event.lng, event.lat]).addTo(heroMap);
             });
         });
     </script>
 </body>
  
 </html>
+ 
