@@ -605,10 +605,10 @@ app.post('/api/events', authenticateRequired, async (req, res) => {
     if (String(state).length > 120 || String(district).length > 120 || String(city).length > 80 || String(address).length > 250) {
       return res.status(400).json({ error: 'INVALID_EVENT_LOCATION', message: 'State, district, city, or local address is too long.' });
     }
-    if (!['map', 'pincode'].includes(locationMethod)) {
+    if (!['map', 'manual'].includes(locationMethod)) {
       return res.status(400).json({ error: 'INVALID_EVENT_LOCATION_METHOD', message: 'Choose a valid location entry method.' });
     }
-    if (locationMethod === 'pincode' && !/^\d{6}$/.test(String(pincode || ''))) {
+    if (locationMethod === 'manual' && !/^\d{6}$/.test(String(pincode || ''))) {
       return res.status(400).json({ error: 'INVALID_EVENT_PINCODE', message: 'Enter a valid 6-digit PIN code.' });
     }
 
@@ -641,7 +641,7 @@ app.post('/api/events', authenticateRequired, async (req, res) => {
       volunteersNeeded: volunteersNeeded || 50,
       volunteersJoined: 0,
       address,
-      pincode: locationMethod === 'pincode' ? String(pincode) : null,
+      pincode: locationMethod === 'manual' ? String(pincode) : null,
       city,
       state,
       district,

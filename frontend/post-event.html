@@ -190,13 +190,13 @@
                             <label class="location-method-option selected">
                                 <input type="radio" name="location-method" value="map" checked>
                                 <span class="location-method-icon" aria-hidden="true">📍</span>
-                                <span class="location-method-copy"><strong>Drop a map pin</strong><small>Set the exact spot and adjust it on the map.</small></span>
+                                <span class="location-method-copy"><strong>Drop a map pin</strong><small>Choose the spot on the map and fine-tune its position.</small></span>
                                 <span class="location-method-check" aria-hidden="true">✓</span>
                             </label>
                             <label class="location-method-option">
-                                <input type="radio" name="location-method" value="pincode">
-                                <span class="location-method-icon" aria-hidden="true">⌖</span>
-                                <span class="location-method-copy"><strong>Enter a PIN code</strong><small>Quickly find the area using its six-digit code.</small></span>
+                                <input type="radio" name="location-method" value="manual">
+                                <span class="location-method-icon" aria-hidden="true">✎</span>
+                                <span class="location-method-copy"><strong>Fill location manually</strong><small>Enter the address and six-digit PIN code yourself.</small></span>
                                 <span class="location-method-check" aria-hidden="true">✓</span>
                             </label>
                         </div>
@@ -225,9 +225,10 @@
                         </div>
                         <div class="form-group" id="map-location-instructions">
                             <label>Pin Location on Map *</label>
-                            <p class="form-help">Search the local address below or click the map, then drag the pin to fine-tune.</p>
+                            <p class="form-help">Click the map to place a pin, then drag it to fine-tune the spot.</p>
                         </div>
                     </div>
+                    <div id="manual-location-fields" hidden>
                     <div class="form-group">
                         <label for="event-address">Local Address / Landmark *</label>
                         <input type="text" class="form-control" id="event-address" maxlength="250"
@@ -243,6 +244,7 @@
                             autocomplete="postal-code" pattern="[0-9]{6}" minlength="6" maxlength="6"
                             placeholder="6-digit PIN code" title="Enter a 6-digit Indian PIN code" required>
                         <p class="form-help">Enter the six-digit PIN code for the event location.</p>
+                    </div>
                     </div>
                     <div class="map-picker" id="map-picker-field">
                         <div id="picker-map"></div>
@@ -450,6 +452,7 @@
         const cityInput = document.getElementById('event-city');
         const pincodeInput = document.getElementById('event-pincode');
         const pincodeField = document.getElementById('pincode-field');
+        const manualLocationFields = document.getElementById('manual-location-fields');
         const mapLocationInstructions = document.getElementById('map-location-instructions');
         const mapPickerField = document.getElementById('map-picker-field');
         const mapCoordinatesField = document.getElementById('map-coordinates-field');
@@ -462,7 +465,7 @@
             return document.querySelector('input[name="location-method"]:checked')?.value || 'map';
         }
         function updateLocationMethod() {
-            const usePincode = selectedLocationMethod() === 'pincode';
+            const useManualLocation = selectedLocationMethod() === 'manual';
             document.querySelectorAll('.location-method-option').forEach(option => {
                 const input = option.querySelector('input');
                 option.classList.toggle('selected', input.checked);
@@ -470,12 +473,14 @@
             latInput.value = '';
             lngInput.value = '';
             if (pinMarker) { pinMarker.remove(); pinMarker = null; }
-            pincodeField.hidden = !usePincode;
-            pincodeInput.required = usePincode;
-            mapLocationInstructions.hidden = usePincode;
-            mapPickerField.hidden = usePincode;
-            mapCoordinatesField.hidden = usePincode;
-            if (usePincode) {
+            manualLocationFields.hidden = !useManualLocation;
+            pincodeField.hidden = !useManualLocation;
+            pincodeInput.required = useManualLocation;
+            addressInput.required = useManualLocation;
+            mapLocationInstructions.hidden = useManualLocation;
+            mapPickerField.hidden = useManualLocation;
+            mapCoordinatesField.hidden = useManualLocation;
+            if (useManualLocation) {
                 if (pincodeInput.value.length === 6) scheduleLookup();
             } else {
                 setTimeout(() => pickerMap.resize(), 0);
@@ -581,7 +586,7 @@
         async function lookupAddress() {
             const address = addressInput.value.trim();
             const city = cityInput.value.trim();
-            const pincode = selectedLocationMethod() === 'pincode' ? pincodeInput.value.trim() : '';
+            const pincode = selectedLocationMethod() === 'manual' ? pincodeInput.value.trim() : '';
             if (address.length < 4 && !(pincode && /^[0-9]{6}$/.test(pincode))) { statusEl.textContent = ''; matchesEl.replaceChildren(); return; }
  
             const myId = ++lookupId;
@@ -626,7 +631,7 @@
         cityInput.addEventListener('input', scheduleLookup);
         pincodeInput.addEventListener('input', () => {
             pincodeInput.value = pincodeInput.value.replace(/\D/g, '').slice(0, 6);
-            if (pincodeInput.value.length === 6 && selectedLocationMethod() === 'pincode') scheduleLookup();
+            if (pincodeInput.value.length === 6 && selectedLocationMethod() === 'manual') scheduleLookup();
         });
     </script>
  
@@ -722,10 +727,10 @@
  
             const locationMethod = document.querySelector('input[name="location-method"]:checked')?.value || 'map';
             const lat = parseFloat(val('event-lat')), lng = parseFloat(val('event-lng'));
-            if (locationMethod === 'pincode' && !/^[0-9]{6}$/.test(val('event-pincode')))
+            if (locationMethod === 'manual' && !/^[0-9]{6}$/.test(val('event-pincode')))
                 return showToast('Enter a valid 6-digit PIN code', 'info');
             if (Number.isNaN(lat) || Number.isNaN(lng))
-                return showToast(locationMethod === 'pincode' ? 'Enter a valid PIN code and wait for its location to be found' : 'Please click on the map to pin the event location', 'info');
+                return showToast(locationMethod === 'manual' ? 'Enter a valid PIN code and wait for its location to be found' : 'Please click on the map to pin the event location', 'info');
 
             if (!selectedState() || !selectedDistrict() || !val('event-city'))
                 return showToast('Choose a state, district, and city/town from the location lists', 'info');
@@ -755,7 +760,7 @@
                 volunteersNeeded: Math.max(1, parseInt(val('volunteers-needed'), 10) || 50),
                 address: val('event-address'),
                 locationMethod,
-                pincode: locationMethod === 'pincode' ? val('event-pincode') : null,
+                pincode: locationMethod === 'manual' ? val('event-pincode') : null,
                 city: val('event-city'),
                 state: selectedState(),
                 district: selectedDistrict(),
