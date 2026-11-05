@@ -100,6 +100,7 @@
  
         function render(event) {
             const cat = getCategoryInfo(event.category);
+            const administrativeLocation = [event.city, event.district, event.state].filter(Boolean).join(', ');
             const pct = () => Math.min(100, Math.round((event.volunteersJoined / event.volunteersNeeded) * 100));
             const joinedKey = 'serveo_joined';
             const getJoined = () => { try { return JSON.parse(localStorage.getItem(joinedKey) || '[]').map(String); } catch { return []; } };
@@ -188,7 +189,7 @@
             <div class="detail-meta-list">
               <div class="detail-meta-row"><span>📅 Date</span><strong>${formatEventDate(event.date)}</strong></div>
               <div class="detail-meta-row"><span>🕐 Time</span><strong>${formatEventTime(event)}</strong></div>
-              <div class="detail-meta-row"><span>📍 City</span><strong>${event.city}</strong></div>
+              <div class="detail-meta-row"><span>📍 Area</span><strong>${administrativeLocation}</strong></div>
             </div>
  
             <div id="progress-wrap">${volunteerProgressHTML(event)}</div>

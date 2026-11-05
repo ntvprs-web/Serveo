@@ -226,7 +226,7 @@ class DatabaseManager {
 
       if (search && search.trim()) {
         params.push(`%${search.trim().toLowerCase()}%`);
-        query += ` AND (LOWER(e.title) LIKE $${params.length} OR LOWER(e.city) LIKE $${params.length} OR LOWER(e.organizer) LIKE $${params.length} OR LOWER(e.address) LIKE $${params.length})`;
+        query += ` AND (LOWER(e.title) LIKE $${params.length} OR LOWER(e.city) LIKE $${params.length} OR LOWER(e.state) LIKE $${params.length} OR LOWER(e.district) LIKE $${params.length} OR LOWER(e.organizer) LIKE $${params.length} OR LOWER(e.address) LIKE $${params.length})`;
       }
 
       query += ` ORDER BY e.created_at DESC`;
@@ -259,6 +259,8 @@ class DatabaseManager {
           const match =
             (e.title && e.title.toLowerCase().includes(s)) ||
             (e.city && e.city.toLowerCase().includes(s)) ||
+            (e.state && e.state.toLowerCase().includes(s)) ||
+            (e.district && e.district.toLowerCase().includes(s)) ||
             (e.organizer && e.organizer.toLowerCase().includes(s)) ||
             (e.address && e.address.toLowerCase().includes(s));
           if (!match) return false;
@@ -312,6 +314,8 @@ class DatabaseManager {
       organizer: eventData.organizer,
       verified: Boolean(eventData.verified),
       city: eventData.city,
+      state: eventData.state || null,
+      district: eventData.district || null,
       address: eventData.address,
       lat: Number(eventData.lat),
       lng: Number(eventData.lng),
@@ -332,12 +336,12 @@ class DatabaseManager {
 
     if (this.mode === 'postgres') {
       await this.pool.query(
-        `INSERT INTO events (id, owner_id, title, category, organizer, verified, city, address, lat, lng, date, start_time, end_time, volunteers_needed, volunteers_joined, urgency, description, donation_link, tags, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
+        `INSERT INTO events (id, owner_id, title, category, organizer, verified, city, state, district, address, lat, lng, date, start_time, end_time, volunteers_needed, volunteers_joined, urgency, description, donation_link, tags, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`,
         [
           formattedEvent.id, ownerId, formattedEvent.title, formattedEvent.category,
           formattedEvent.organizer, formattedEvent.verified, formattedEvent.city,
-          formattedEvent.address, formattedEvent.lat, formattedEvent.lng,
+          formattedEvent.state, formattedEvent.district, formattedEvent.address, formattedEvent.lat, formattedEvent.lng,
           formattedEvent.date, formattedEvent.startTime, formattedEvent.endTime,
           formattedEvent.volunteersNeeded, formattedEvent.volunteersJoined,
           formattedEvent.urgency, formattedEvent.description, formattedEvent.donationLink,
@@ -1012,6 +1016,8 @@ class DatabaseManager {
       organizer: r.organizer,
       verified: r.verified,
       city: r.city,
+      state: r.state || '',
+      district: r.district || '',
       address: r.address,
       lat: Number(r.lat),
       lng: Number(r.lng),

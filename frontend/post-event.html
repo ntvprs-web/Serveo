@@ -159,7 +159,7 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="event-date">Date *</label>
+                            <label for="event-date">Event Date *</label>
                             <input type="date" class="form-control" id="event-date" required>
                         </div>
                         <div class="form-group">
@@ -183,23 +183,40 @@
                 <!-- Location -->
                 <div class="form-section">
                     <h3 class="form-section-title">📍 Location</h3>
-                    <div class="form-group">
-                        <label for="event-address">Full Address *</label>
-                        <input type="text" class="form-control" id="event-address" maxlength="250"
-                            placeholder="e.g., Red Cross Bhawan, Parliament Street, New Delhi" required>
-                        <p class="form-help" id="addr-status"></p>
-                        <div class="place-results" id="addr-matches"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-state">State / Union Territory *</label>
+                            <select class="form-control" id="event-state" required>
+                                <option value="">Loading states...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="event-district">District *</label>
+                            <select class="form-control" id="event-district" required disabled>
+                                <option value="">Select a state first</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="event-city">City *</label>
-                            <input type="text" class="form-control" id="event-city" maxlength="80"
-                                placeholder="e.g., New Delhi" required>
+                            <label for="event-city">City / Town *</label>
+                            <input type="text" class="form-control" id="event-city" list="event-city-options" maxlength="80"
+                                placeholder="Search a place or enter its name" autocomplete="address-level2" required>
+                            <datalist id="event-city-options"></datalist>
                         </div>
                         <div class="form-group">
                             <label>Pin Location on Map *</label>
-                            <p class="form-help">Set automatically from the address. Drag the pin to adjust.</p>
+                            <p class="form-help">Search the local address below or click the map, then drag the pin to fine-tune.</p>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="event-address">Local Address / Landmark *</label>
+                        <input type="text" class="form-control" id="event-address" maxlength="250"
+                            placeholder="Building, street, area, or nearby landmark" autocomplete="street-address" required>
+                        <p class="form-help" id="addr-status"></p>
+                        <div class="place-results" id="addr-matches"></div>
+                        <p class="form-help" id="admin-location-status" aria-live="polite">Choose the event's state and district first. City suggestions appear when you search for a location.</p>
+                        <button type="button" class="btn btn-secondary btn-sm" id="retry-districts" hidden>Retry district list</button>
                     </div>
                     <div class="map-picker">
                         <div id="picker-map"></div>
@@ -310,8 +327,91 @@
         }
         document.getElementById('custom-category').addEventListener('input', updateCategoryBadgePreview);
  
-        // Don't allow dates in the past
-        document.getElementById('event-date').min = new Date().toISOString().slice(0, 10);
+        // Use the viewer's local date so the date picker does not shift near midnight UTC.
+        const eventDateInput = document.getElementById('event-date');
+        const localToday = new Date();
+        eventDateInput.min = [localToday.getFullYear(), String(localToday.getMonth() + 1).padStart(2, '0'), String(localToday.getDate()).padStart(2, '0')].join('-');
+
+        // India state and district choices use LGD administrative codes.
+        const INDIA_LOCATION_API = 'https://india-lgd-index-api.vercel.app/v1';
+        const stateSelect = document.getElementById('event-state');
+        const districtSelect = document.getElementById('event-district');
+        const adminLocationStatus = document.getElementById('admin-location-status');
+        const retryDistrictsButton = document.getElementById('retry-districts');
+        const indiaStates = [
+            ['35', 'Andaman and Nicobar Islands'], ['28', 'Andhra Pradesh'], ['12', 'Arunachal Pradesh'],
+            ['18', 'Assam'], ['10', 'Bihar'], ['4', 'Chandigarh'], ['22', 'Chhattisgarh'],
+            ['26', 'Dadra and Nagar Haveli and Daman and Diu'], ['7', 'Delhi'], ['30', 'Goa'],
+            ['24', 'Gujarat'], ['6', 'Haryana'], ['2', 'Himachal Pradesh'], ['1', 'Jammu and Kashmir'],
+            ['20', 'Jharkhand'], ['29', 'Karnataka'], ['32', 'Kerala'], ['37', 'Ladakh'],
+            ['31', 'Lakshadweep'], ['23', 'Madhya Pradesh'], ['27', 'Maharashtra'], ['14', 'Manipur'],
+            ['17', 'Meghalaya'], ['15', 'Mizoram'], ['13', 'Nagaland'], ['21', 'Odisha'],
+            ['34', 'Puducherry'], ['3', 'Punjab'], ['8', 'Rajasthan'], ['11', 'Sikkim'],
+            ['33', 'Tamil Nadu'], ['36', 'Telangana'], ['16', 'Tripura'], ['9', 'Uttar Pradesh'],
+            ['5', 'Uttarakhand'], ['19', 'West Bengal']
+        ];
+
+        function fillSelect(select, items, placeholder, getValue, getLabel) {
+            select.replaceChildren(new Option(placeholder, ''));
+            items.forEach(item => select.add(new Option(getLabel(item), getValue(item))));
+        }
+
+        function getCachedLocationList(key) {
+            try {
+                const cached = JSON.parse(localStorage.getItem(key) || 'null');
+                if (cached && Array.isArray(cached.data)) return cached.data;
+            } catch { }
+            return null;
+        }
+
+        async function loadLocationList(url, cacheKey) {
+            try {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 10000);
+                const response = await fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeout));
+                if (!response.ok) throw new Error(`Location list unavailable (${response.status})`);
+                const result = await response.json();
+                if (!Array.isArray(result.data)) throw new Error('Location list response was invalid');
+                try { localStorage.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), data: result.data })); } catch { }
+                return { data: result.data, cached: false };
+            } catch (error) {
+                const cached = getCachedLocationList(cacheKey);
+                if (cached?.length) return { data: cached, cached: true };
+                throw error;
+            }
+        }
+
+        fillSelect(stateSelect, indiaStates, 'Select state / UT', item => item[0], item => item[1]);
+        districtSelect.replaceChildren(new Option('Select a state first', ''));
+        let districtLoadId = 0;
+        stateSelect.addEventListener('change', async () => {
+            const currentLoadId = ++districtLoadId;
+            retryDistrictsButton.hidden = true;
+            districtSelect.replaceChildren(new Option('Loading districts...', ''));
+            districtSelect.disabled = true;
+            if (!stateSelect.value) {
+                districtSelect.replaceChildren(new Option('Select a state first', ''));
+                adminLocationStatus.textContent = 'Choose the event\'s state and district first. City suggestions appear when you search for a location.';
+                return;
+            }
+            adminLocationStatus.textContent = 'Loading districts for the selected state...';
+            const cacheKey = `serveo_india_districts_${stateSelect.value}_v1`;
+            try {
+                const { data, cached } = await loadLocationList(`${INDIA_LOCATION_API}/districts?state=${encodeURIComponent(stateSelect.value)}`, cacheKey);
+                if (currentLoadId !== districtLoadId) return;
+                fillSelect(districtSelect, data, 'Select district', item => String(item.code), item => item.name);
+                districtSelect.disabled = false;
+                adminLocationStatus.textContent = cached
+                    ? 'Using saved district choices. City suggestions appear when you search for a location.'
+                    : 'Choose your district, then add a city / town and local address.';
+            } catch (error) {
+                if (currentLoadId !== districtLoadId) return;
+                districtSelect.replaceChildren(new Option('District list could not load', ''));
+                adminLocationStatus.textContent = 'District choices could not load. Check your connection and retry.';
+                retryDistrictsButton.hidden = false;
+            }
+        });
+        retryDistrictsButton.addEventListener('click', () => stateSelect.dispatchEvent(new Event('change')));
  
         // ===== Location picker (Mapbox GL: smooth like Google Maps) =====
         const pickerMap = serveoCreateMap('picker-map', { center: [79, 22.5], zoom: 4 });
@@ -322,6 +422,7 @@
         const lngInput = document.getElementById('event-lng');
         const addressInput = document.getElementById('event-address');
         const cityInput = document.getElementById('event-city');
+        const cityOptions = document.getElementById('event-city-options');
         let pinMarker = null;
  
         // Remember whether the user typed the address/city themselves
@@ -374,6 +475,9 @@
         function pinPlace(p) {
             setPin(p.lng, p.lat, { fly: true, skipLookup: true });
             autoFill(cityInput, p.city);
+            if (p.city && !Array.from(cityOptions.options).some(option => option.value === p.city)) {
+                cityOptions.add(new Option(p.city, p.city));
+            }
             statusEl.textContent = '📍 Pinned: ' + p.label;
         }
  
@@ -385,9 +489,14 @@
             const myId = ++lookupId;
             statusEl.textContent = 'Finding location...';
             try {
-                const query = city && !address.toLowerCase().includes(city.toLowerCase()) ? address + ', ' + city : address;
+                const state = stateSelect.selectedOptions[0]?.textContent || '';
+                const district = districtSelect.selectedOptions[0]?.textContent || '';
+                const query = [address, city, district, state, 'India'].filter(Boolean).join(', ');
                 const places = await serveoSearchPlaces(query);
                 if (myId !== lookupId) return;            // a newer search started
+
+                const suggestedCities = [...new Set(places.map(place => place.city).filter(Boolean))];
+                cityOptions.replaceChildren(...suggestedCities.map(name => new Option(name, name)));
  
                 if (!places.length) {
                     statusEl.textContent = 'Could not find this address. Add the city, or click the map to set the location.';
@@ -427,6 +536,8 @@
         const form = document.getElementById('event-form');
         const btn = document.getElementById('submit-btn');
         const val = (id) => document.getElementById(id).value.trim();
+        const selectedState = () => document.getElementById('event-state').selectedOptions[0]?.textContent || '';
+        const selectedDistrict = () => document.getElementById('event-district').selectedOptions[0]?.textContent || '';
 
         const banner = document.getElementById('auth-status-banner');
         const bannerTitle = document.getElementById('auth-status-title');
@@ -530,6 +641,8 @@
                 volunteersNeeded: Math.max(1, parseInt(val('volunteers-needed'), 10) || 50),
                 address: val('event-address'),
                 city: val('event-city'),
+                state: selectedState(),
+                district: selectedDistrict(),
                 lat, lng,
                 organizer: val('org-name'),
                 donationLink,

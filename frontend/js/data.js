@@ -423,6 +423,7 @@ function eventCardHTML(event, distanceKm, eventUniverse = EVENTS_DATA) {
   const distanceLabel = typeof distanceKm === 'number' ? `${distanceKm.toFixed(1)} km away` : '';
   const renderText = value => event._htmlEscaped ? String(value ?? '') : escapeHTML(value);
   const eventHref = `event-detail.html?id=${encodeURIComponent(String(event.id ?? ''))}`;
+  const locationLabel = [event.city, event.district, event.state].filter(Boolean).map(renderText).join(', ');
   return `
     <a href="${escapeHTML(eventHref)}" class="event-card glass-card">
       <div class="event-card-top" style="background: linear-gradient(135deg, ${cat.color}33, ${cat.color}0d)">
@@ -439,7 +440,7 @@ function eventCardHTML(event, distanceKm, eventUniverse = EVENTS_DATA) {
         <p class="event-card-org">${renderText(event.organizer)}</p>
         <div class="event-card-meta">
           <span>📅 ${formatEventDate(event.date)}</span>
-          <span>📍 ${renderText(event.city)}${distanceLabel ? ' · ' + distanceLabel : ''}</span>
+          <span>📍 ${locationLabel}${distanceLabel ? ' · ' + distanceLabel : ''}</span>
         </div>
         ${volunteerProgressHTML(event)}
       </div>

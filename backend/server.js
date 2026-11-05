@@ -37,7 +37,7 @@ app.use(helmet({
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://api.mapbox.com", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://api.mapbox.com", "https://*.mapbox.com", "https://*.tile.openstreetmap.org", "https://images.unsplash.com"],
-      connectSrc: ["'self'", "https://api.mapbox.com", "https://*.mapbox.com", "https://events.mapbox.com", "http://localhost:*", "http://127.0.0.1:*"],
+      connectSrc: ["'self'", "https://api.mapbox.com", "https://*.mapbox.com", "https://events.mapbox.com", "https://india-lgd-index-api.vercel.app", "http://localhost:*", "http://127.0.0.1:*"],
       workerSrc: ["'self'", "blob:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       objectSrc: ["'none'"]
@@ -593,12 +593,33 @@ app.post('/api/events', authenticateRequired, async (req, res) => {
   try {
     const {
       title, description, category, date, startTime, endTime,
-      volunteersNeeded, address, city, lat, lng, organizer,
+      volunteersNeeded, address, city, state, district, lat, lng, organizer,
       donationLink, tags, orgType, contact, email
     } = req.body;
 
-    if (!title || !category || !date || !startTime || !endTime || !address || !city || lat == null || lng == null || !organizer) {
+    const requiredEventText = [title, description, category, startTime, endTime, address, city, state, district, organizer];
+    if (requiredEventText.some(value => typeof value !== 'string' || !value.trim()) || !date || lat == null || lng == null || String(lat).trim() === '' || String(lng).trim() === '') {
       return res.status(400).json({ error: 'MISSING_EVENT_FIELDS', message: 'Missing required event fields.' });
+    }
+
+    if (String(state).length > 120 || String(district).length > 120 || String(city).length > 80 || String(address).length > 250) {
+      return res.status(400).json({ error: 'INVALID_EVENT_LOCATION', message: 'State, district, city, or local address is too long.' });
+    }
+
+    const dateValue = String(date);
+    const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? new Date(`${dateValue}T00:00:00.000Z`) : null;
+    const todayInIndia = new Date(Date.now() + 330 * 60 * 1000).toISOString().slice(0, 10);
+    if (!parsedDate || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== dateValue || dateValue < todayInIndia) {
+      return res.status(400).json({ error: 'INVALID_EVENT_DATE', message: 'Choose a valid event date that is today or later.' });
+    }
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(startTime) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(endTime) || endTime <= startTime) {
+      return res.status(400).json({ error: 'INVALID_EVENT_TIME', message: 'Choose a valid start and end time.' });
+    }
+
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return res.status(400).json({ error: 'INVALID_EVENT_LOCATION', message: 'Choose a valid point on the map.' });
     }
 
     // Events start as 'pending' — requires admin approval to appear on public map
@@ -608,15 +629,17 @@ app.post('/api/events', authenticateRequired, async (req, res) => {
       title,
       description,
       category,
-      date,
+      date: dateValue,
       startTime,
       endTime,
       volunteersNeeded: volunteersNeeded || 50,
       volunteersJoined: 0,
       address,
       city,
-      lat,
-      lng,
+      state,
+      district,
+      lat: latitude,
+      lng: longitude,
       organizer,
       donationLink: donationLink || null,
       tags: tags || [category],

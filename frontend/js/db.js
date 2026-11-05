@@ -26,6 +26,8 @@ export function safeEvent(ev) {
     title: esc(ev.title),
     organizer: esc(ev.organizer),
     city: esc(ev.city),
+    state: esc(ev.state),
+    district: esc(ev.district),
     address: esc(ev.address),
     description: esc(ev.description),
     lat: Number(ev.lat),

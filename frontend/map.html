@@ -193,6 +193,7 @@
               <span>📅 ${formatEventDate(event.date)}</span>
               <span>🕐 ${formatEventTime(event)}</span>
               <span>📍 ${escapeHTML(event.address)}</span>
+              ${event.city ? `<span>🏙️ ${escapeHTML([event.city, event.district, event.state].filter(Boolean).join(', '))}</span>` : ''}
               ${distLine}
             </div>
             ${volunteerProgressHTML(event)}
