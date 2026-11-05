@@ -183,6 +183,11 @@
                 <!-- Location -->
                 <div class="form-section">
                     <h3 class="form-section-title">📍 Location</h3>
+                    <fieldset class="form-group">
+                        <legend>How would you like to set the location? *</legend>
+                        <label><input type="radio" name="location-method" value="map" checked> Drop a pin on the map</label>
+                        <label style="margin-left: var(--space-md)"><input type="radio" name="location-method" value="pincode"> Enter a PIN code</label>
+                    </fieldset>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="event-state">State / Union Territory *</label>
@@ -205,7 +210,7 @@
                             </select>
                             <p class="form-help">Choose a city, town, or local administrative area from the selected district.</p>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="map-location-instructions">
                             <label>Pin Location on Map *</label>
                             <p class="form-help">Search the local address below or click the map, then drag the pin to fine-tune.</p>
                         </div>
@@ -219,17 +224,17 @@
                         <p class="form-help" id="admin-location-status" aria-live="polite">Choose the event's state and district first. City suggestions appear when you search for a location.</p>
                         <button type="button" class="btn btn-secondary btn-sm" id="retry-districts" hidden>Retry location choices</button>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="pincode-field" hidden>
                         <label for="event-pincode">PIN Code *</label>
                         <input type="text" class="form-control" id="event-pincode" inputmode="numeric"
                             autocomplete="postal-code" pattern="[0-9]{6}" minlength="6" maxlength="6"
                             placeholder="6-digit PIN code" title="Enter a 6-digit Indian PIN code" required>
                         <p class="form-help">Enter the six-digit PIN code for the event location.</p>
                     </div>
-                    <div class="map-picker">
+                    <div class="map-picker" id="map-picker-field">
                         <div id="picker-map"></div>
                     </div>
-                    <div class="form-row" style="margin-top: var(--space-md)">
+                    <div class="form-row" id="map-coordinates-field" style="margin-top: var(--space-md)">
                         <div class="form-group">
                             <label for="event-lat">Latitude</label>
                             <input type="text" class="form-control" id="event-lat" placeholder="Auto-detected" readonly>
@@ -430,10 +435,37 @@
         const lngInput = document.getElementById('event-lng');
         const addressInput = document.getElementById('event-address');
         const cityInput = document.getElementById('event-city');
+        const pincodeInput = document.getElementById('event-pincode');
+        const pincodeField = document.getElementById('pincode-field');
+        const mapLocationInstructions = document.getElementById('map-location-instructions');
+        const mapPickerField = document.getElementById('map-picker-field');
+        const mapCoordinatesField = document.getElementById('map-coordinates-field');
         const statusEl = document.getElementById('addr-status');
         const matchesEl = document.getElementById('addr-matches');
         let pinMarker = null;
         let lookupTimer = null, lookupId = 0, cityLoadId = 0;
+
+        function selectedLocationMethod() {
+            return document.querySelector('input[name="location-method"]:checked')?.value || 'map';
+        }
+        function updateLocationMethod() {
+            const usePincode = selectedLocationMethod() === 'pincode';
+            latInput.value = '';
+            lngInput.value = '';
+            if (pinMarker) { pinMarker.remove(); pinMarker = null; }
+            pincodeField.hidden = !usePincode;
+            pincodeInput.required = usePincode;
+            mapLocationInstructions.hidden = usePincode;
+            mapPickerField.hidden = usePincode;
+            mapCoordinatesField.hidden = usePincode;
+            if (usePincode) {
+                if (pincodeInput.value.length === 6) scheduleLookup();
+            } else {
+                setTimeout(() => pickerMap.resize(), 0);
+            }
+        }
+        document.querySelectorAll('input[name="location-method"]').forEach(input => input.addEventListener('change', updateLocationMethod));
+        updateLocationMethod();
  
         // Remember whether the user typed the address/city themselves
         addressInput.addEventListener('input', () => { addressInput.dataset.auto = '0'; });
@@ -532,14 +564,15 @@
         async function lookupAddress() {
             const address = addressInput.value.trim();
             const city = cityInput.value.trim();
-            if (address.length < 4) { statusEl.textContent = ''; matchesEl.replaceChildren(); return; }
+            const pincode = selectedLocationMethod() === 'pincode' ? pincodeInput.value.trim() : '';
+            if (address.length < 4 && !(pincode && /^[0-9]{6}$/.test(pincode))) { statusEl.textContent = ''; matchesEl.replaceChildren(); return; }
  
             const myId = ++lookupId;
             statusEl.textContent = 'Finding location...';
             try {
                 const state = stateSelect.selectedOptions[0]?.textContent || '';
                 const district = districtSelect.selectedOptions[0]?.textContent || '';
-                const query = [address, city, district, state, 'India'].filter(Boolean).join(', ');
+                const query = [address, pincode, city, district, state, 'India'].filter(Boolean).join(', ');
                 const places = await serveoSearchPlaces(query);
                 if (myId !== lookupId) return;            // a newer search started
 
@@ -574,6 +607,10 @@
         }
         addressInput.addEventListener('input', scheduleLookup);
         cityInput.addEventListener('input', scheduleLookup);
+        pincodeInput.addEventListener('input', () => {
+            pincodeInput.value = pincodeInput.value.replace(/\D/g, '').slice(0, 6);
+            if (pincodeInput.value.length === 6 && selectedLocationMethod() === 'pincode') scheduleLookup();
+        });
     </script>
  
     <!-- Save the event to Firestore (as "pending" until approved) -->
@@ -666,14 +703,15 @@
             const category = form.querySelector('input[name="category"]:checked')?.value;
             if (!category) return showToast('Please choose an event category', 'info');
  
+            const locationMethod = document.querySelector('input[name="location-method"]:checked')?.value || 'map';
             const lat = parseFloat(val('event-lat')), lng = parseFloat(val('event-lng'));
+            if (locationMethod === 'pincode' && !/^[0-9]{6}$/.test(val('event-pincode')))
+                return showToast('Enter a valid 6-digit PIN code', 'info');
             if (Number.isNaN(lat) || Number.isNaN(lng))
-                return showToast('Please click on the map to pin the event location', 'info');
+                return showToast(locationMethod === 'pincode' ? 'Enter a valid PIN code and wait for its location to be found' : 'Please click on the map to pin the event location', 'info');
 
             if (!selectedState() || !selectedDistrict() || !val('event-city'))
                 return showToast('Choose a state, district, and city/town from the location lists', 'info');
-            if (!/^[0-9]{6}$/.test(val('event-pincode')))
-                return showToast('Enter a valid 6-digit PIN code', 'info');
  
             if (val('end-time') <= val('start-time'))
                 return showToast('End time must be after start time', 'info');
@@ -699,7 +737,8 @@
                 endTime: val('end-time'),
                 volunteersNeeded: Math.max(1, parseInt(val('volunteers-needed'), 10) || 50),
                 address: val('event-address'),
-                pincode: val('event-pincode'),
+                locationMethod,
+                pincode: locationMethod === 'pincode' ? val('event-pincode') : null,
                 city: val('event-city'),
                 state: selectedState(),
                 district: selectedDistrict(),

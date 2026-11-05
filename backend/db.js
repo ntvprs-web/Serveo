@@ -317,7 +317,7 @@ class DatabaseManager {
       state: eventData.state || null,
       district: eventData.district || null,
       address: eventData.address,
-      pincode: String(eventData.pincode || ''),
+      pincode: eventData.pincode ? String(eventData.pincode) : null,
       lat: Number(eventData.lat),
       lng: Number(eventData.lng),
       date: eventData.date,
