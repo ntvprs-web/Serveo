@@ -593,17 +593,20 @@ app.post('/api/events', authenticateRequired, async (req, res) => {
   try {
     const {
       title, description, category, date, startTime, endTime,
-      volunteersNeeded, address, city, state, district, lat, lng, organizer,
+      volunteersNeeded, address, pincode, city, state, district, lat, lng, organizer,
       donationLink, tags, orgType, contact, email
     } = req.body;
 
-    const requiredEventText = [title, description, category, startTime, endTime, address, city, state, district, organizer];
+    const requiredEventText = [title, description, category, startTime, endTime, address, pincode, city, state, district, organizer];
     if (requiredEventText.some(value => typeof value !== 'string' || !value.trim()) || !date || lat == null || lng == null || String(lat).trim() === '' || String(lng).trim() === '') {
       return res.status(400).json({ error: 'MISSING_EVENT_FIELDS', message: 'Missing required event fields.' });
     }
 
     if (String(state).length > 120 || String(district).length > 120 || String(city).length > 80 || String(address).length > 250) {
       return res.status(400).json({ error: 'INVALID_EVENT_LOCATION', message: 'State, district, city, or local address is too long.' });
+    }
+    if (!/^\d{6}$/.test(String(pincode))) {
+      return res.status(400).json({ error: 'INVALID_EVENT_PINCODE', message: 'Enter a valid 6-digit PIN code.' });
     }
 
     const dateValue = String(date);
@@ -635,6 +638,7 @@ app.post('/api/events', authenticateRequired, async (req, res) => {
       volunteersNeeded: volunteersNeeded || 50,
       volunteersJoined: 0,
       address,
+      pincode: String(pincode),
       city,
       state,
       district,

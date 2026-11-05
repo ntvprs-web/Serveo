@@ -137,7 +137,7 @@
  
           <div class="glass-card detail-section">
             <h3>Location</h3>
-            <p class="detail-address">📍 ${event.address}</p>
+            <p class="detail-address">📍 ${event.address}${event.pincode ? `, PIN ${event.pincode}` : ''}</p>
             <div class="detail-map-wrap">
               <div id="detail-map"></div>
             </div>

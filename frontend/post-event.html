@@ -201,9 +201,9 @@
                         <div class="form-group">
                             <label for="event-city">City / Town *</label>
                             <select class="form-control" id="event-city" required disabled>
-                                <option value="">Search a location to load choices</option>
+                                <option value="">Select a district first</option>
                             </select>
-                            <p class="form-help">Choose a city or town from the location results. If the address is hard to find, click the map to load nearby choices.</p>
+                            <p class="form-help">Choose a city, town, or local administrative area from the selected district.</p>
                         </div>
                         <div class="form-group">
                             <label>Pin Location on Map *</label>
@@ -217,7 +217,14 @@
                         <p class="form-help" id="addr-status"></p>
                         <div class="place-results" id="addr-matches"></div>
                         <p class="form-help" id="admin-location-status" aria-live="polite">Choose the event's state and district first. City suggestions appear when you search for a location.</p>
-                        <button type="button" class="btn btn-secondary btn-sm" id="retry-districts" hidden>Retry district list</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="retry-districts" hidden>Retry location choices</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="event-pincode">PIN Code *</label>
+                        <input type="text" class="form-control" id="event-pincode" inputmode="numeric"
+                            autocomplete="postal-code" pattern="[0-9]{6}" minlength="6" maxlength="6"
+                            placeholder="6-digit PIN code" title="Enter a 6-digit Indian PIN code" required>
+                        <p class="form-help">Enter the six-digit PIN code for the event location.</p>
                     </div>
                     <div class="map-picker">
                         <div id="picker-map"></div>
@@ -426,14 +433,15 @@
         const statusEl = document.getElementById('addr-status');
         const matchesEl = document.getElementById('addr-matches');
         let pinMarker = null;
-        let lookupTimer = null, lookupId = 0;
+        let lookupTimer = null, lookupId = 0, cityLoadId = 0;
  
         // Remember whether the user typed the address/city themselves
         addressInput.addEventListener('input', () => { addressInput.dataset.auto = '0'; });
         function resetCityChoices() {
             clearTimeout(lookupTimer);
             lookupId++;
-            cityInput.replaceChildren(new Option('Search a location to load choices', ''));
+            cityLoadId++;
+            cityInput.replaceChildren(new Option('Select a district first', ''));
             cityInput.disabled = true;
             matchesEl.replaceChildren();
         }
@@ -450,6 +458,30 @@
         }
         stateSelect.addEventListener('change', resetCityChoices);
         districtSelect.addEventListener('change', resetCityChoices);
+        districtSelect.addEventListener('change', async () => {
+            const districtCode = districtSelect.value;
+            const currentLoadId = ++cityLoadId;
+            if (!districtCode) return;
+            cityInput.replaceChildren(new Option('Loading city and town choices...', ''));
+            cityInput.disabled = true;
+            adminLocationStatus.textContent = 'Loading city and town choices for the selected district...';
+            try {
+                const cacheKey = `serveo_india_subdistricts_${districtCode}_v1`;
+                const { data, cached } = await loadLocationList(`${INDIA_LOCATION_API}/subdistricts?district=${encodeURIComponent(districtCode)}`, cacheKey);
+                if (currentLoadId !== cityLoadId) return;
+                const names = [...new Set(data.map(item => item.name).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+                setCityChoices(names);
+                adminLocationStatus.textContent = names.length
+                    ? `${cached ? 'Using saved' : 'Loaded'} ${names.length} city / town choices for this district.`
+                    : 'No city or town choices were found for this district.';
+            } catch {
+                if (currentLoadId !== cityLoadId) return;
+                cityInput.replaceChildren(new Option('City / town list could not load', ''));
+                cityInput.disabled = true;
+                adminLocationStatus.textContent = 'City and town choices could not load. Check your connection and retry.';
+                retryDistrictsButton.hidden = false;
+            }
+        });
         function autoFill(input, value) {
             if (value && (!input.value.trim() || input.dataset.auto === '1')) {
                 input.value = value;
@@ -640,6 +672,8 @@
 
             if (!selectedState() || !selectedDistrict() || !val('event-city'))
                 return showToast('Choose a state, district, and city/town from the location lists', 'info');
+            if (!/^[0-9]{6}$/.test(val('event-pincode')))
+                return showToast('Enter a valid 6-digit PIN code', 'info');
  
             if (val('end-time') <= val('start-time'))
                 return showToast('End time must be after start time', 'info');
@@ -665,6 +699,7 @@
                 endTime: val('end-time'),
                 volunteersNeeded: Math.max(1, parseInt(val('volunteers-needed'), 10) || 50),
                 address: val('event-address'),
+                pincode: val('event-pincode'),
                 city: val('event-city'),
                 state: selectedState(),
                 district: selectedDistrict(),

@@ -317,6 +317,7 @@ class DatabaseManager {
       state: eventData.state || null,
       district: eventData.district || null,
       address: eventData.address,
+      pincode: String(eventData.pincode || ''),
       lat: Number(eventData.lat),
       lng: Number(eventData.lng),
       date: eventData.date,
@@ -336,12 +337,12 @@ class DatabaseManager {
 
     if (this.mode === 'postgres') {
       await this.pool.query(
-        `INSERT INTO events (id, owner_id, title, category, organizer, verified, city, state, district, address, lat, lng, date, start_time, end_time, volunteers_needed, volunteers_joined, urgency, description, donation_link, tags, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`,
+        `INSERT INTO events (id, owner_id, title, category, organizer, verified, city, state, district, address, pincode, lat, lng, date, start_time, end_time, volunteers_needed, volunteers_joined, urgency, description, donation_link, tags, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
         [
           formattedEvent.id, ownerId, formattedEvent.title, formattedEvent.category,
           formattedEvent.organizer, formattedEvent.verified, formattedEvent.city,
-          formattedEvent.state, formattedEvent.district, formattedEvent.address, formattedEvent.lat, formattedEvent.lng,
+          formattedEvent.state, formattedEvent.district, formattedEvent.address, formattedEvent.pincode, formattedEvent.lat, formattedEvent.lng,
           formattedEvent.date, formattedEvent.startTime, formattedEvent.endTime,
           formattedEvent.volunteersNeeded, formattedEvent.volunteersJoined,
           formattedEvent.urgency, formattedEvent.description, formattedEvent.donationLink,
@@ -1019,6 +1020,7 @@ class DatabaseManager {
       state: r.state || '',
       district: r.district || '',
       address: r.address,
+      pincode: r.pincode || '',
       lat: Number(r.lat),
       lng: Number(r.lng),
       date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),

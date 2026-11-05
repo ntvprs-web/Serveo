@@ -29,6 +29,7 @@ export function safeEvent(ev) {
     state: esc(ev.state),
     district: esc(ev.district),
     address: esc(ev.address),
+    pincode: esc(ev.pincode),
     description: esc(ev.description),
     lat: Number(ev.lat),
     lng: Number(ev.lng),
