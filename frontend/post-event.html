@@ -200,9 +200,10 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="event-city">City / Town *</label>
-                            <input type="text" class="form-control" id="event-city" list="event-city-options" maxlength="80"
-                                placeholder="Search a place or enter its name" autocomplete="address-level2" required>
-                            <datalist id="event-city-options"></datalist>
+                            <select class="form-control" id="event-city" required disabled>
+                                <option value="">Search a location to load choices</option>
+                            </select>
+                            <p class="form-help">Choose a city or town from the location results. If the address is hard to find, click the map to load nearby choices.</p>
                         </div>
                         <div class="form-group">
                             <label>Pin Location on Map *</label>
@@ -422,11 +423,33 @@
         const lngInput = document.getElementById('event-lng');
         const addressInput = document.getElementById('event-address');
         const cityInput = document.getElementById('event-city');
-        const cityOptions = document.getElementById('event-city-options');
+        const statusEl = document.getElementById('addr-status');
+        const matchesEl = document.getElementById('addr-matches');
         let pinMarker = null;
+        let lookupTimer = null, lookupId = 0;
  
         // Remember whether the user typed the address/city themselves
-        [addressInput, cityInput].forEach(i => i.addEventListener('input', () => { i.dataset.auto = '0'; }));
+        addressInput.addEventListener('input', () => { addressInput.dataset.auto = '0'; });
+        function resetCityChoices() {
+            clearTimeout(lookupTimer);
+            lookupId++;
+            cityInput.replaceChildren(new Option('Search a location to load choices', ''));
+            cityInput.disabled = true;
+            matchesEl.replaceChildren();
+        }
+        function setCityChoices(names) {
+            const choices = [...new Set(names.map(name => String(name || '').trim()).filter(Boolean))];
+            cityInput.replaceChildren(new Option('Choose city / town', ''), ...choices.map(name => new Option(name, name)));
+            cityInput.disabled = choices.length === 0;
+        }
+        function addCityChoice(name) {
+            const value = String(name || '').trim();
+            if (!value) return;
+            const choices = Array.from(cityInput.options).map(option => option.value).filter(Boolean);
+            if (!choices.includes(value)) setCityChoices([...choices, value]);
+        }
+        stateSelect.addEventListener('change', resetCityChoices);
+        districtSelect.addEventListener('change', resetCityChoices);
         function autoFill(input, value) {
             if (value && (!input.value.trim() || input.dataset.auto === '1')) {
                 input.value = value;
@@ -454,12 +477,12 @@
  
             if (opts.fly) pickerMap.flyTo({ center: [lng, lat], zoom: Math.max(pickerMap.getZoom(), 15), duration: 1200 });
  
-            // fill empty address / city automatically
+            // Fill the address automatically; city/town must be selected from the resulting choices.
             if (!opts.skipLookup) {
                 serveoReverseGeocode(lng, lat).then(r => {
                     if (!r) return;
                     autoFill(addressInput, r.label);
-                    autoFill(cityInput, r.city);
+                    addCityChoice(r.city);
                 }).catch(() => { });
             }
         }
@@ -468,16 +491,9 @@
         pickerMap.on('click', (e) => setPin(e.lngLat.lng, e.lngLat.lat));
  
         // ===== Type the address -> the best match is pinned on the map automatically =====
-        const statusEl = document.getElementById('addr-status');
-        const matchesEl = document.getElementById('addr-matches');
-        let lookupTimer = null, lookupId = 0;
- 
         function pinPlace(p) {
             setPin(p.lng, p.lat, { fly: true, skipLookup: true });
-            autoFill(cityInput, p.city);
-            if (p.city && !Array.from(cityOptions.options).some(option => option.value === p.city)) {
-                cityOptions.add(new Option(p.city, p.city));
-            }
+            addCityChoice(p.city);
             statusEl.textContent = '📍 Pinned: ' + p.label;
         }
  
@@ -496,10 +512,10 @@
                 if (myId !== lookupId) return;            // a newer search started
 
                 const suggestedCities = [...new Set(places.map(place => place.city).filter(Boolean))];
-                cityOptions.replaceChildren(...suggestedCities.map(name => new Option(name, name)));
+                setCityChoices(suggestedCities);
  
                 if (!places.length) {
-                    statusEl.textContent = 'Could not find this address. Add the city, or click the map to set the location.';
+                    statusEl.textContent = 'Could not find this address. Try a nearby street or landmark, or click the map to load city choices.';
                     matchesEl.replaceChildren();
                     return;
                 }
@@ -536,8 +552,14 @@
         const form = document.getElementById('event-form');
         const btn = document.getElementById('submit-btn');
         const val = (id) => document.getElementById(id).value.trim();
-        const selectedState = () => document.getElementById('event-state').selectedOptions[0]?.textContent || '';
-        const selectedDistrict = () => document.getElementById('event-district').selectedOptions[0]?.textContent || '';
+        const selectedState = () => {
+            const field = document.getElementById('event-state');
+            return field.value ? field.selectedOptions[0]?.textContent || '' : '';
+        };
+        const selectedDistrict = () => {
+            const field = document.getElementById('event-district');
+            return field.value ? field.selectedOptions[0]?.textContent || '' : '';
+        };
 
         const banner = document.getElementById('auth-status-banner');
         const bannerTitle = document.getElementById('auth-status-title');
@@ -615,6 +637,9 @@
             const lat = parseFloat(val('event-lat')), lng = parseFloat(val('event-lng'));
             if (Number.isNaN(lat) || Number.isNaN(lng))
                 return showToast('Please click on the map to pin the event location', 'info');
+
+            if (!selectedState() || !selectedDistrict() || !val('event-city'))
+                return showToast('Choose a state, district, and city/town from the location lists', 'info');
  
             if (val('end-time') <= val('start-time'))
                 return showToast('End time must be after start time', 'info');
