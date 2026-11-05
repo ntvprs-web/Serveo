@@ -499,7 +499,7 @@ function renderDrawerActivity() {
   list.innerHTML = filtered.slice(0, 8).map(record => {
     const category = typeof getCategoryInfo === 'function' ? getCategoryInfo(record.category) : { icon: '🌍', label: 'Community' };
     const dateLabel = record.date ? new Date(`${record.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Date pending';
-    const url = record.sample ? 'events.html' : `event-detail.html?id=${encodeURIComponent(record.id)}`;
+    const url = record.sample ? 'events.html' : `/event/${encodeURIComponent(record.id)}`;
     const kindLabel = (record.kind === 'organized' ? 'Organized' : 'Volunteering');
     const statusLabel = drawerRecordStatus(record);
     const communityEvent = 'Community event';

@@ -56,6 +56,8 @@ npm start
 
 For automatic restart while editing, run `npm run dev`. If VS Code opened the parent `serveo 29 oct` folder, use its `npm start` task or open the `Serveo-app` folder directly.
 
+For production SEO, set `SITE_URL` to the site's canonical HTTPS origin (for example, `https://serveo.example`) before deployment. The server uses it to generate canonical tags, `robots.txt`, and a sitemap containing public pages and approved event URLs.
+
 Open your browser and navigate to:
 **[http://localhost:3000](http://localhost:3000)**
 

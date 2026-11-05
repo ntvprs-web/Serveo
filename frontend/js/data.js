@@ -422,7 +422,7 @@ function eventCardHTML(event, distanceKm, eventUniverse = EVENTS_DATA) {
   const cat = getCategoryInfo(event.category);
   const distanceLabel = typeof distanceKm === 'number' ? `${distanceKm.toFixed(1)} km away` : '';
   const renderText = value => event._htmlEscaped ? String(value ?? '') : escapeHTML(value);
-  const eventHref = `event-detail.html?id=${encodeURIComponent(String(event.id ?? ''))}`;
+  const eventHref = `/event/${encodeURIComponent(String(event.id ?? ''))}`;
   const locationLabel = [event.city, event.district, event.state].filter(Boolean).map(renderText).join(', ');
   return `
     <a href="${escapeHTML(eventHref)}" class="event-card glass-card">

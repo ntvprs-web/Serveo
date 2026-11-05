@@ -890,19 +890,118 @@ const frontendPath = fs.existsSync(path.join(__dirname, '../frontend'))
   ? path.join(__dirname, '../frontend')
   : path.join(__dirname, '../serveo');
 
+const seoPages = {
+  'index.html': { path: '/', title: 'SERVEO | Find Community Service Events Near You', description: 'Discover nearby blood drives, medical camps, food support, disaster relief, and other community service events across India.' },
+  'events.html': { path: '/events', title: 'Community Service Events Near You | SERVEO', description: 'Find and join upcoming blood drives, medical camps, food distribution, disaster relief, and volunteer events near you.' },
+  'about.html': { path: '/about', title: 'About SERVEO | Community Action Across India', description: 'Learn how SERVEO connects volunteers, organizers, and communities through local public service initiatives.' },
+  'impact.html': { path: '/impact', title: 'Community Impact Dashboard | SERVEO', description: 'Explore SERVEO community impact, volunteer participation, and public service activity across India.' },
+  'map.html': { path: '/map', title: 'Map of Nearby Community Events | SERVEO', description: 'Explore community service events on the SERVEO map and find ways to help nearby.' },
+  'urgent-blood.html': { path: '/urgent-blood', title: 'Urgent Blood Requests and Donors | SERVEO', description: 'Find urgent blood donation requests and learn how to support nearby patients and hospitals.' },
+  'privacy.html': { path: '/privacy', title: 'Privacy Policy | SERVEO', description: 'Read how SERVEO handles account, event, notification, and optional location information.' },
+  'terms.html': { path: '/terms', title: 'Terms of Use | SERVEO', description: 'Review the terms for using SERVEO to discover, organize, and support community service events.' },
+  'login.html': { path: '/login', title: 'Sign In or Register | SERVEO', description: 'Sign in or create a SERVEO account to join community service events or manage an organization.' },
+  'organizer.html': { path: '/organizer', title: 'Organizer Dashboard | SERVEO', description: 'Manage your SERVEO organization and community service events.' },
+  'post-event.html': { path: '/post-event', title: 'Post a Community Service Event | SERVEO', description: 'Create a community service event listing on SERVEO.' },
+  'premium.html': { path: '/premium', title: 'SERVEO Premium', description: 'Learn about SERVEO Premium features.' },
+  'badges.html': { path: '/badges', title: 'Organizer Badges | SERVEO', description: 'Explore SERVEO organizer badges.' },
+  'seed.html': { path: '/seed', title: 'SERVEO Setup', description: 'SERVEO application setup utility.' },
+  'event-detail.html': { path: '/event-detail', title: 'Event Details | SERVEO', description: 'View community service event details on SERVEO.' }
+};
+const noIndexPages = new Set(['login.html', 'organizer.html', 'post-event.html', 'premium.html', 'seed.html', 'event-detail.html']);
+const configuredSiteUrl = process.env.SITE_URL || (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(value => value.trim()).find(value => /^https:\/\//i.test(value));
+let seoSiteOrigin = '';
+try {
+  const parsedSiteUrl = new URL(configuredSiteUrl || '');
+  if (['http:', 'https:'].includes(parsedSiteUrl.protocol)) seoSiteOrigin = parsedSiteUrl.origin;
+} catch { }
+
+function htmlEscape(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
+
+function seoHtml(html, { title, description, canonicalPath, noIndex = false, structuredData = null }) {
+  const safeTitle = htmlEscape(title);
+  const safeDescription = htmlEscape(description);
+  html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/i, `<title>${safeTitle}</title>`);
+  const descriptionTag = `<meta name="description" content="${safeDescription}">`;
+  if (/<meta\s+name=["']description["'][^>]*>/i.test(html)) {
+    html = html.replace(/<meta\s+name=["']description["'][^>]*>/i, descriptionTag);
+  } else {
+    html = html.replace(/<\/head>/i, `  ${descriptionTag}\n</head>`);
+  }
+  html = html.replace(/\s*<link\s+rel=["']canonical["'][^>]*>/gi, '');
+  html = html.replace(/\s*<meta\s+(?:property=["']og:[^"']+["']|name=["']twitter:[^"']+["'])[^>]*>/gi, '');
+  const canonical = seoSiteOrigin ? `${seoSiteOrigin}${canonicalPath}` : '';
+  const tags = [
+    noIndex ? '<meta name="robots" content="noindex,follow">' : '<meta name="robots" content="index,follow">',
+    canonical ? `<link rel="canonical" href="${htmlEscape(canonical)}">` : '',
+    '<meta property="og:type" content="website">',
+    `<meta property="og:title" content="${safeTitle}">`,
+    `<meta property="og:description" content="${safeDescription}">`,
+    canonical ? `<meta property="og:url" content="${htmlEscape(canonical)}">` : '',
+    seoSiteOrigin ? `<meta property="og:image" content="${htmlEscape(`${seoSiteOrigin}/images/icon-512.png`)}">` : '',
+    '<meta name="twitter:card" content="summary">',
+    `<meta name="twitter:title" content="${safeTitle}">`,
+    `<meta name="twitter:description" content="${safeDescription}">`,
+    seoSiteOrigin ? `<meta name="twitter:image" content="${htmlEscape(`${seoSiteOrigin}/images/icon-512.png`)}">` : '',
+    structuredData ? `<script type="application/ld+json">${JSON.stringify(structuredData).replace(/</g, '\\u003c')}</script>` : ''
+  ].filter(Boolean).join('\n  ');
+  return html.replace(/<\/head>/i, `  ${tags}\n</head>`);
+}
+
+async function sendSeoPage(res, filename, options = {}) {
+  const page = seoPages[filename] || {};
+  let html;
+  try { html = await fs.promises.readFile(path.join(frontendPath, filename), 'utf8'); }
+  catch { return res.status(404).send('Page not found'); }
+  const title = options.title || page.title || 'SERVEO | Community Service Events';
+  const description = options.description || page.description || 'Discover and support community service events with SERVEO.';
+  const structuredData = options.structuredData || (filename === 'index.html' ? {
+    '@context': 'https://schema.org', '@type': 'WebSite', name: 'SERVEO', url: seoSiteOrigin || undefined,
+    description: page.description
+  } : null);
+  res.type('html').send(seoHtml(html, {
+    title, description, canonicalPath: options.canonicalPath || page.path || '/',
+    noIndex: options.noIndex ?? noIndexPages.has(filename), structuredData
+  }));
+}
+
+app.get('/robots.txt', (req, res) => {
+  const sitemapLine = seoSiteOrigin ? `Sitemap: ${seoSiteOrigin}/sitemap.xml\n` : '';
+  res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\n${sitemapLine}`);
+});
+
+app.get('/sitemap.xml', async (req, res) => {
+  if (!seoSiteOrigin) return res.status(503).type('text/plain').send('Set SITE_URL to the public HTTPS site URL to generate the sitemap.');
+  const urls = Object.entries(seoPages).filter(([filename]) => !noIndexPages.has(filename)).map(([, page]) => page.path);
+  try {
+    const events = await db.getEvents({ status: 'approved' });
+    for (const event of events) if (event.id) urls.push(`/event/${encodeURIComponent(String(event.id))}`);
+  } catch (error) { console.error('Sitemap event lookup failed:', error.message); }
+  const uniqueUrls = [...new Set(urls)];
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${uniqueUrls.map(route => `  <url><loc>${htmlEscape(`${seoSiteOrigin}${route}`)}</loc></url>`).join('\n')}\n</urlset>`;
+  res.type('application/xml').send(xml);
+});
+
+app.get(/^\/(index|events|about|impact|map|urgent-blood|privacy|terms|login|organizer|post-event|premium|badges|seed|event-detail)\.html$/, (req, res) => {
+  const filename = path.basename(req.path);
+  return sendSeoPage(res, filename);
+});
+
 app.use(express.static(frontendPath));
 
 // Clean URLs & friendly route aliases
-const htmlRoutes = ['map', 'events', 'event-detail', 'events-detail', 'event', 'post-event', 'organizer', 'organization', 'dashboard', 'impact', 'about', 'seed', 'login', 'premium', 'terms', 'privacy'];
+const htmlRoutes = ['map', 'events', 'event-detail', 'events-detail', 'event', 'post-event', 'organizer', 'organization', 'dashboard', 'impact', 'about', 'seed', 'login', 'premium', 'terms', 'privacy', 'urgent-blood', 'badges'];
 htmlRoutes.forEach(r => {
   app.get(`/${r}`, (req, res) => {
     if (['event', 'events-detail'].includes(r)) {
-      return res.sendFile(path.join(frontendPath, 'event-detail.html'));
+      return sendSeoPage(res, 'event-detail.html', { canonicalPath: '/event-detail', noIndex: true });
     }
     if (['organization', 'dashboard'].includes(r)) {
-      return res.sendFile(path.join(frontendPath, 'organizer.html'));
+      return sendSeoPage(res, 'organizer.html', { canonicalPath: '/organizer', noIndex: true });
     }
-    res.sendFile(path.join(frontendPath, `${r}.html`));
+    return sendSeoPage(res, `${r}.html`, { canonicalPath: `/${r}` });
   });
 });
 
@@ -912,19 +1011,35 @@ app.get(['/organization-login', '/organizer-login', '/org-login'], (req, res) =>
 });
 
 // Dynamic event-detail routes: /event/1, /event-detail/1, /events-detail/1
-app.get(['/event/:id', '/event-detail/:id', '/events-detail/:id'], (req, res) => {
-  res.sendFile(path.join(frontendPath, 'event-detail.html'));
+app.get(['/event/:id', '/event-detail/:id', '/events-detail/:id'], async (req, res) => {
+  const event = await db.getEventById(req.params.id).catch(() => null);
+  if (!event || event.status !== 'approved') return sendSeoPage(res.status(404), 'event-detail.html', { canonicalPath: `/event/${encodeURIComponent(req.params.id)}`, noIndex: true });
+  const description = String(event.description || '').replace(/\s+/g, ' ').trim().slice(0, 300) || `Join ${event.title} in ${event.city || event.state || 'your community'} with SERVEO.`;
+  const canonicalPath = `/event/${encodeURIComponent(String(event.id))}`;
+  const structuredData = {
+    '@context': 'https://schema.org', '@type': 'Event', name: event.title,
+    description, startDate: `${event.date}T${event.startTime || '00:00'}:00+05:30`,
+    endDate: `${event.date}T${event.endTime || event.startTime || '23:59'}:00+05:30`,
+    eventStatus: 'https://schema.org/EventScheduled', eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    location: { '@type': 'Place', name: [event.city, event.district, event.state].filter(Boolean).join(', '), address: {
+      '@type': 'PostalAddress', streetAddress: event.address || '', addressLocality: event.city || '', addressRegion: event.state || '', postalCode: event.pincode || '', addressCountry: 'IN'
+    }, ...(Number.isFinite(Number(event.lat)) && Number.isFinite(Number(event.lng)) ? { geo: { '@type': 'GeoCoordinates', latitude: Number(event.lat), longitude: Number(event.lng) } } : {}) },
+    organizer: { '@type': 'Organization', name: event.organizer || 'SERVEO' }, url: seoSiteOrigin ? `${seoSiteOrigin}${canonicalPath}` : undefined
+  };
+  return sendSeoPage(res, 'event-detail.html', {
+    title: `${event.title} in ${event.city || event.state || 'India'} | SERVEO`, description, canonicalPath, structuredData
+  });
 });
 
 // Root route
 app.get('/', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
+  sendSeoPage(res, 'index.html', { canonicalPath: '/' });
 });
 
 // Fallback to index.html for unrecognized non-API routes
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(frontendPath, 'index.html'));
+  res.status(404).send('Page not found');
 });
 
 // ==================== START SERVER ====================
