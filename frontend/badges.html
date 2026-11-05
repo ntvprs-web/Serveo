@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore interactive SERVEO event category badges for organizers.">
+  <title>Verified Badge Shop — SERVEO</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/terms.css">
+  <link rel="stylesheet" href="css/navbar.css">
+  <link rel="stylesheet" href="css/badges.css">
+</head>
+<body>
+  <div class="ambient-bg"></div>
+  <div id="navbar-root"></div>
+  <main class="badge-shop container">
+    <header class="badge-shop-intro">
+      <span class="eyebrow">SERVEO · ORGANIZER TOOLS</span>
+      <h1>Event <span class="gradient-text">badge studio</span></h1>
+      <p>Choose an animated category badge to highlight an organizer’s focus on matching event cards. Badges are visual labels; they do not verify an organizer, event, or service.</p>
+      <div class="badge-shop-notice"><strong>Demo checkout</strong><span>Badge purchases are simulated in this prototype. No payment is collected and badges are saved in this browser.</span></div>
+    </header>
+    <section class="badge-shop-toolbar" aria-label="Badge shop controls">
+      <p id="badge-shop-user">Browsing as guest</p>
+      <a class="btn btn-secondary btn-sm" href="login.html?role=organizer">Organizer login / demo account</a>
+    </section>
+    <section class="badge-grid" id="badge-grid" aria-live="polite"></section>
+    <p class="badge-shop-footnote">A SERVEO category badge is not a verification seal. Organizer credentials are reviewed separately.</p>
+  </main>
+  <div id="footer-root"></div>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script defer src="js/legal-content.js"></script>
+  <script defer src="js/terms.js"></script>
+  <script src="js/badges.js"></script>
+</body>
+</html>

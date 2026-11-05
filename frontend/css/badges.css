@@ -1,0 +1,27 @@
+.badge-shop { padding-block: clamp(2rem, 6vw, 4.5rem); }
+.badge-shop-intro { max-width: 820px; margin: 0 auto 1.5rem; text-align: center; }
+.badge-shop-intro h1 { margin: .55rem 0 .75rem; font-size: clamp(2rem, 6vw, 3.7rem); }
+.badge-shop-intro > p { max-width: 700px; margin: 0 auto; color: var(--text-secondary); line-height: 1.7; }
+.badge-shop-notice { display: flex; flex-direction: column; gap: 4px; max-width: 620px; margin: 1.25rem auto 0; padding: 13px 16px; border: 1px solid rgba(245,158,11,.28); border-radius: 14px; color: var(--text-secondary); background: rgba(245,158,11,.06); font-size: .87rem; }
+.badge-shop-notice strong { color: #f4bd58; }
+.badge-shop-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 14px; }
+.badge-shop-toolbar p { margin: 0; color: var(--text-secondary); font-size: .9rem; }
+.badge-grid { display: grid; grid-template-columns: repeat( auto-fit, minmax(min(100%, 230px), 1fr)); gap: 15px; }
+.badge-product { --product-color: var(--accent-primary); position: relative; display: flex; flex-direction: column; min-height: 245px; padding: 20px; border: 1px solid color-mix(in srgb, var(--product-color) 26%, var(--border-color)); border-radius: 18px; background: linear-gradient(145deg, color-mix(in srgb, var(--product-color) 9%, var(--bg-card)), var(--bg-card)); box-shadow: var(--shadow-raised); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.badge-product:hover, .badge-product:focus-within { transform: translateY(-4px); border-color: color-mix(in srgb, var(--product-color) 60%, white 10%); box-shadow: var(--shadow-raised-hover); }
+.badge-product-preview { display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 15px; border: 1px solid color-mix(in srgb, var(--product-color) 45%, transparent); border-radius: 24px; color: white; background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--product-color) 75%, white), var(--product-color) 62%, color-mix(in srgb, var(--product-color) 65%, black)); box-shadow: 0 8px 26px color-mix(in srgb, var(--product-color) 28%, transparent), inset 0 1px rgba(255,255,255,.45); font-size: 2.1rem; animation: badge-float 2.8s ease-in-out infinite; }
+.badge-product:nth-child(2n) .badge-product-preview { animation-delay: -.9s; }
+@keyframes badge-float { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
+.badge-product h2 { margin: 0 0 6px; font-size: 1.05rem; }
+.badge-product p { flex: 1; margin: 0 0 14px; color: var(--text-secondary); font-size: .83rem; line-height: 1.5; }
+.badge-product-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.badge-product-price { color: var(--text-primary); font-weight: 800; font-variant-numeric: tabular-nums; }
+.badge-buy { min-height: 38px; padding: 0 13px; border: 1px solid color-mix(in srgb, var(--product-color) 45%, transparent); border-radius: 10px; color: var(--text-primary); background: color-mix(in srgb, var(--product-color) 13%, transparent); font: inherit; font-size: .8rem; font-weight: 750; cursor: pointer; }
+.badge-buy:hover { background: color-mix(in srgb, var(--product-color) 24%, transparent); }
+.badge-buy[aria-pressed="true"] { color: #071c1a; border-color: transparent; background: #51d8bd; }
+.badge-shop-footnote { margin: 18px 0 0; color: var(--text-tertiary); font-size: .78rem; text-align: center; }
+.verified-badge-interactive { cursor: help; animation: verified-glow 2.5s ease-in-out infinite; }
+@keyframes verified-glow { 0%,100% { filter: drop-shadow(0 0 0 transparent); } 50% { filter: drop-shadow(0 0 5px rgba(45,210,156,.5)); } }
+.verified-badge-interactive:focus-visible { outline: 2px solid #59dfbf; outline-offset: 3px; }
+@media (max-width: 540px) { .badge-shop-toolbar { align-items: stretch; flex-direction: column; } .badge-shop-toolbar .btn { width: 100%; justify-content: center; } }
+@media (prefers-reduced-motion: reduce) { .badge-product-preview, .verified-badge-interactive { animation: none; } .badge-product { transition: none; } }

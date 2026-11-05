@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+ 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Event details on SERVEO — location, organizer info, and how to help.">
+    <title>Event Details — SERVEO</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/terms.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/event-detail.css">
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+    <style>
+        /* Smooth map: no blur layers behind the moving map */
+        .detail-section, .detail-section.glass-card, .detail-map-wrap {
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+        }
+        .detail-section.glass-card { background: var(--bg-secondary) !important; }
+        #detail-map { transform: translateZ(0); }
+    </style>
+
+</head>
+ 
+<body>
+    <div class="ambient-bg"></div>
+    <div id="navbar-root"></div>
+ 
+    <div class="detail-page" id="detail-page">
+        <div class="container" style="padding: 4rem 0; text-align: center; color: var(--text-secondary);">
+            Loading event...
+        </div>
+    </div>
+ 
+    <div id="footer-root"></div>
+ 
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <script src="js/maptiles.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script defer src="js/legal-content.js"></script>
+    <script defer src="js/terms.js"></script>
+    <script type="module" src="js/notifications.js"></script>
+    <script>
+        document.getElementById('navbar-root').innerHTML = getNavbarHTML('events');
+        document.getElementById('footer-root').innerHTML = getFooterHTML();
+    </script>
+ 
+    <script type="module">
+        import { getApprovedEvent, safeEvent, getMe, getEventReviews, submitEventReview, getOrganizerOverview } from './js/db.js';
+        import { openVolunteerForm } from './js/volunteer-flow.js';
+ 
+        const urlParams = new URLSearchParams(window.location.search);
+        let eventId = urlParams.get('id');
+        if (!eventId) {
+            const pathParts = window.location.pathname.split('/').filter(Boolean);
+            const lastPart = pathParts[pathParts.length - 1];
+            if (lastPart && !lastPart.includes('.html') && !['event', 'event-detail', 'events-detail'].includes(lastPart)) {
+                eventId = lastPart;
+            }
+        }
+        if (!eventId) eventId = '1';
+
+        const page = document.getElementById('detail-page');
+ 
+        // ----- load the event (Node API first, demo data as a fallback) -----
+        let event = null;
+        try {
+            const live = await getApprovedEvent(eventId);
+            if (live) event = safeEvent(live);
+        } catch (err) {
+            console.warn('Backend event fetch note:', err);
+        }
+        if (!event && typeof EVENTS_DATA !== 'undefined' && Array.isArray(EVENTS_DATA)) {
+            const sampleEvent = EVENTS_DATA.find(e => String(e.id).trim() === String(eventId).trim()) || null;
+            event = sampleEvent ? { ...sampleEvent, isSample: true } : null;
+            // If still no event and defaulted to 1, use first sample event
+            if (!event && (eventId === '1' || !eventId) && EVENTS_DATA.length > 0) {
+                event = { ...EVENTS_DATA[0], isSample: true };
+            }
+        }
+ 
+        if (!event) {
+            page.innerHTML = `
+              <div class="container" style="padding: 4rem 0; text-align: center;">
+                <h2>Event not found</h2>
+                <p style="margin: 1rem 0; color: var(--text-secondary);">This event may have ended, is waiting for approval, or the link may be incorrect.</p>
+                <div style="display: flex; gap: 12px; justify-content: center; margin-top: 1.5rem;">
+                  <a href="events.html" class="btn btn-primary">← Browse All Events</a>
+                  <a href="map.html" class="btn btn-secondary">🗺️ View Live Map</a>
+                </div>
+              </div>`;
+        } else {
+            render(event);
+        }
+ 
+        function render(event) {
+            const cat = getCategoryInfo(event.category);
+            const pct = () => Math.min(100, Math.round((event.volunteersJoined / event.volunteersNeeded) * 100));
+            const joinedKey = 'serveo_joined';
+            const getJoined = () => { try { return JSON.parse(localStorage.getItem(joinedKey) || '[]').map(String); } catch { return []; } };
+            const alreadyJoined = getJoined().includes(String(event.id));
+ 
+            const decoder = document.createElement('textarea');   // safely turns &amp; back into &
+            decoder.innerHTML = event.title;
+            document.title = `${decoder.value} — SERVEO`;
+ 
+            page.innerHTML = `
+      <div class="detail-hero" style="background: linear-gradient(180deg, ${cat.color}22, transparent 70%)">
+        <div class="container">
+          <a href="events.html" class="detail-back">← Back to Events</a>
+          <div class="detail-hero-top">
+            <span class="detail-icon" style="background:${cat.color}">${cat.icon}</span>
+            <div class="detail-badges">
+              ${categoryBadgeHTML(event.category) || categoryLabelHTML(event.category)}
+              ${urgencyBadgeHTML(event)}
+              ${verifiedBadgeHTML(event)}
+            </div>
+          </div>
+          <span class="detail-cat">${escapeHTML(cat.label)}</span>
+          <h1>${event.title}</h1>
+          <p class="detail-org-line">Organized by <strong>${event.organizer}</strong></p>
+        </div>
+      </div>
+ 
+      <div class="container detail-body">
+        <div class="detail-main">
+          <div class="glass-card detail-section">
+            <h3>About this event</h3>
+            <p>${event.description}</p>
+          </div>
+ 
+          <div class="glass-card detail-section">
+            <h3>Location</h3>
+            <p class="detail-address">📍 ${event.address}</p>
+            <div class="detail-map-wrap">
+              <div id="detail-map"></div>
+            </div>
+          </div>
+ 
+          <div class="glass-card detail-section">
+            <h3>Organizer</h3>
+            <div class="detail-organizer-row">
+              <div class="detail-org-avatar" style="color:${cat.color};background:${cat.color}22;border:1px solid ${cat.color}66">${cat.icon}</div>
+              <div>
+                <p class="detail-org-name">${event.organizer} ${event.verified ? '<span class="mini-verified">✓ Verified</span>' : ''}</p>
+                <p class="detail-org-sub">${event.verified ? 'Trusted organizer on SERVEO' : 'Organizer on SERVEO'}</p>
+              </div>
+            </div>
+            <div id="event-org-achievements" class="event-org-achievements" aria-live="polite"></div>
+          </div>
+
+          <section class="glass-card detail-section review-section" aria-labelledby="event-reviews-title">
+            <div class="review-section-heading">
+              <div><h3 id="event-reviews-title">Community reviews</h3><p id="review-summary" class="review-summary">Loading reviews…</p></div>
+              <span class="review-section-icon" aria-hidden="true">✦</span>
+            </div>
+            <form id="event-review-form" class="event-review-form">
+              <fieldset class="review-rating-field">
+                <legend>Your rating</legend>
+                <div class="review-star-picker" role="radiogroup" aria-label="Rate this event from one to five stars">
+                  ${[1, 2, 3, 4, 5].map(star => `<input id="review-rating-${star}" type="radio" name="rating" value="${star}" ${star === 5 ? 'checked' : ''}><label for="review-rating-${star}" aria-label="${star} ${star === 1 ? 'star' : 'stars'}">★</label>`).join('')}
+                </div>
+              </fieldset>
+              <fieldset class="review-outcome-field">
+                <legend>Did the event happen?</legend>
+                <label><input type="radio" name="outcome" value="event_held" checked> Yes, it happened</label>
+                <label><input type="radio" name="outcome" value="false_alarm"> No, it did not happen</label>
+              </fieldset>
+              <label class="review-comment-label" for="review-comment">Your experience and suggestions</label>
+              <textarea id="review-comment" name="comment" rows="4" maxlength="1200" placeholder="What went well? What could organizers improve?" required></textarea>
+              <label class="review-photo-label" for="review-photos">Event photos <span>(up to 3)</span></label>
+              <input id="review-photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+              <p class="review-photo-help">Photos are resized before upload. JPEG, PNG, or WebP.</p>
+              <div class="review-form-footer"><p id="review-form-message" role="status"></p><button class="btn btn-primary btn-sm" type="submit">Post review</button></div>
+            </form>
+            <div id="review-login-prompt" class="review-login-prompt" hidden><p>Sign in to share a rating, suggestions, or event photos.</p><a class="btn btn-secondary btn-sm" href="login.html">Sign in to review</a></div>
+            <div id="event-review-list" class="event-review-list" aria-live="polite"></div>
+          </div>
+        </div>
+ 
+        <aside class="detail-sidebar">
+          <div class="glass-card detail-action-card">
+            <div class="detail-meta-list">
+              <div class="detail-meta-row"><span>📅 Date</span><strong>${formatEventDate(event.date)}</strong></div>
+              <div class="detail-meta-row"><span>🕐 Time</span><strong>${formatEventTime(event)}</strong></div>
+              <div class="detail-meta-row"><span>📍 City</span><strong>${event.city}</strong></div>
+            </div>
+ 
+            <div id="progress-wrap">${volunteerProgressHTML(event)}</div>
+            <p class="detail-pct" id="pct-text">${pct()}% of volunteer goal reached</p>
+ 
+            <div class="detail-actions">
+              <button class="btn btn-primary btn-lg" id="rsvp-btn" ${alreadyJoined ? 'disabled' : ''}>${alreadyJoined ? '✓ You\'re registered' : '🙋 Volunteer for this Event'}</button>
+              ${event.donationLink ? `<button class="btn btn-secondary btn-lg" id="donate-btn">💛 Donate to Support</button>` : ''}
+              <a href="${getDirectionsURL(event.lat, event.lng)}" target="_blank" rel="noopener" class="btn btn-outline btn-lg">🧭 Get Directions</a>
+            </div>
+ 
+            <button class="detail-share" id="share-btn">🔗 Share this event</button>
+          </div>
+        </aside>
+      </div>
+    `;
+ 
+            // Map (Mapbox GL: smooth like Google Maps)
+            try {
+                const lat = Number(event.lat) || 28.6139;
+                const lng = Number(event.lng) || 77.2090;
+                if (typeof serveoCreateMap === 'function' && typeof mapboxgl !== 'undefined') {
+                    const map = serveoCreateMap('detail-map', { center: [lng, lat], zoom: 14 });
+                    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+                    const pin = document.createElement('div');
+                    pin.className = 'glass-map-marker-wrap';
+                    pin.innerHTML = `<div class="glass-map-marker" style="--marker-color:${cat.color}"><span aria-hidden="true">${cat.icon}</span></div>`;
+                    new mapboxgl.Marker({ element: pin, anchor: 'bottom' }).setLngLat([lng, lat]).addTo(map);
+                } else {
+                    const mapBox = document.getElementById('detail-map');
+                    if (mapBox) mapBox.innerHTML = `<div style="padding: 2.5rem; text-align: center; color: var(--text-secondary);">📍 ${event.address || event.city}</div>`;
+                }
+            } catch (err) {
+                console.warn('Map initialization notice:', err);
+                const mapBox = document.getElementById('detail-map');
+                if (mapBox) mapBox.innerHTML = `<div style="padding: 2.5rem; text-align: center; color: var(--text-secondary);">📍 Location: ${event.address || event.city}</div>`;
+            }
+ 
+            // Volunteer
+            const rsvp = document.getElementById('rsvp-btn');
+            rsvp.addEventListener('click', () => {
+                openVolunteerForm(event, {
+                    onSuccess: (result) => {
+                        event.volunteersJoined = Number(result.volunteersJoined ?? (event.volunteersJoined + 1));
+                        document.getElementById('progress-wrap').innerHTML = volunteerProgressHTML(event);
+                        document.getElementById('pct-text').textContent = `${pct()}% of volunteer goal reached`;
+                        rsvp.disabled = true;
+                        rsvp.textContent = '✓ You\'re registered';
+                        showToast('🎉 Volunteer request sent. The organizer can verify your contact details.');
+                    }
+                });
+            });
+ 
+            // Donate (only upi:// or https:// links are accepted)
+            document.getElementById('donate-btn')?.addEventListener('click', () => {
+                const link = String(event.donationLink || '');
+                if (/^(upi:\/\/|https:\/\/)/i.test(link)) {
+                    showToast('💛 Opening payment...', 'info');
+                    window.location.href = link;
+                } else {
+                    showToast('Donation link is not available', 'info');
+                }
+            });
+ 
+            // Share (copies a link that opens this event's page)
+            document.getElementById('share-btn').addEventListener('click', async () => {
+                const url = location.href;
+                try {
+                    await navigator.clipboard.writeText(url);
+                    showToast('🔗 Link copied to clipboard!', 'info');
+                } catch {
+                    window.prompt('Copy this link:', url);
+                }
+            });
+
+            loadOrganizerAchievements(event);
+            loadEventReviews(event);
+        }
+
+        async function loadOrganizerAchievements(event) {
+            const target = document.getElementById('event-org-achievements');
+            if (!target) return;
+            const sampleEvents = EVENTS_DATA.filter(item => String(item.organizer || '').toLowerCase() === String(event.organizer || '').toLowerCase());
+            let overview = { eventCount: 0, categories: [] };
+            try {
+                overview = await getOrganizerOverview(event.ownerId || event.organizer);
+            } catch (err) {
+                console.warn('Organizer milestone data is unavailable:', err);
+            }
+            const categories = [...new Set([...(overview.categories || []), ...sampleEvents.map(item => item.category), event.category].filter(Boolean))];
+            const count = Math.max(Number(overview.eventCount) || 0, sampleEvents.length, 1);
+            target.innerHTML = organizerAchievementHTML(count, categories);
+        }
+
+        async function photoToDataUrl(file) {
+            if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                throw new Error('Choose a JPEG, PNG, or WebP photo.');
+            }
+            if (file.size > 12 * 1024 * 1024) throw new Error('Choose photos smaller than 12 MB each.');
+            let blob;
+            if (typeof createImageBitmap === 'function') {
+                const bitmap = await createImageBitmap(file);
+                const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+                canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                bitmap.close?.();
+                const encode = quality => new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+                blob = await encode(0.72);
+                if (!blob) throw new Error('This photo could not be prepared. Try another image.');
+                if (blob.size > 350 * 1024) blob = await encode(0.54);
+                if (!blob || blob.size > 350 * 1024) throw new Error('A photo is too large to upload. Please choose a smaller image.');
+            } else {
+                if (file.size > 350 * 1024) throw new Error('A photo is too large to upload. Please choose a smaller image.');
+                blob = file;
+            }
+            return await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('Could not read one of the photos.'));
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        async function loadEventReviews(event) {
+            const form = document.getElementById('event-review-form');
+            const loginPrompt = document.getElementById('review-login-prompt');
+            const summary = document.getElementById('review-summary');
+            const reviewList = document.getElementById('event-review-list');
+            const message = document.getElementById('review-form-message');
+            const photoInput = document.getElementById('review-photos');
+            if (!form || !loginPrompt || !summary || !reviewList) return;
+
+            try {
+                const user = await getMe();
+                form.hidden = !user;
+                loginPrompt.hidden = Boolean(user);
+            } catch {
+                form.hidden = true;
+                loginPrompt.hidden = false;
+            }
+
+            const paintStarPicker = () => {
+                const selected = Number(form.querySelector('input[name="rating"]:checked')?.value || 5);
+                form.querySelectorAll('.review-star-picker label').forEach((label, index) => {
+                    label.classList.toggle('is-selected', index < selected);
+                });
+            };
+            form.querySelectorAll('input[name="rating"]').forEach(input => input.addEventListener('change', paintStarPicker));
+            paintStarPicker();
+
+            photoInput.addEventListener('change', () => {
+                const files = [...photoInput.files];
+                if (files.length > 3) {
+                    photoInput.value = '';
+                    showToast('Choose up to three event photos.', 'info');
+                    return;
+                }
+                form.querySelector('.review-photo-help').textContent = files.length
+                    ? `${files.length} photo${files.length === 1 ? '' : 's'} selected · resized before upload`
+                    : 'Photos are resized before upload. JPEG, PNG, or WebP.';
+            });
+
+            async function refreshReviews() {
+                reviewList.replaceChildren();
+                let reviews;
+                try {
+                    reviews = await getEventReviews(event.id);
+                } catch (err) {
+                    summary.textContent = 'Reviews could not be loaded right now.';
+                    return;
+                }
+
+                if (!Array.isArray(reviews)) reviews = [];
+                if (reviews.length) {
+                    const average = reviews.reduce((total, review) => total + (Number(review.rating) || 0), 0) / reviews.length;
+                    summary.textContent = `${average.toFixed(1)} / 5 · ${reviews.length} ${reviews.length === 1 ? 'review' : 'reviews'}`;
+                } else {
+                    summary.textContent = 'No reviews yet · be the first to share your experience.';
+                }
+
+                reviews.forEach(review => {
+                    const card = document.createElement('article');
+                    card.className = 'event-review-card';
+                    const top = document.createElement('div');
+                    top.className = 'event-review-top';
+                    const reviewer = document.createElement('strong');
+                    reviewer.textContent = review.reviewerName || 'Community member';
+                    const stars = document.createElement('span');
+                    stars.className = 'review-stars';
+                    const rating = Math.max(0, Math.min(5, Number(review.rating) || 0));
+                    stars.textContent = `${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}`;
+                    stars.setAttribute('aria-label', `${rating} out of 5 stars`);
+                    top.append(reviewer, stars);
+                    card.append(top);
+
+                    const meta = document.createElement('p');
+                    meta.className = `event-review-outcome ${review.outcome === 'false_alarm' ? 'is-false-alarm' : ''}`;
+                    const date = review.createdAt && !Number.isNaN(new Date(review.createdAt).getTime())
+                        ? new Date(review.createdAt).toLocaleDateString()
+                        : '';
+                    meta.textContent = `${review.outcome === 'false_alarm' ? 'Event did not happen' : 'Event happened'}${date ? ` · ${date}` : ''}`;
+                    card.append(meta);
+
+                    const comment = document.createElement('p');
+                    comment.className = 'event-review-comment';
+                    comment.textContent = review.comment || '';
+                    card.append(comment);
+
+                    const photos = Array.isArray(review.photos) ? review.photos.slice(0, 3) : [];
+                    const validPhotos = photos.filter(src => typeof src === 'string' && /^data:image\/(?:jpeg|png|webp);base64,/.test(src));
+                    if (validPhotos.length) {
+                        const gallery = document.createElement('div');
+                        gallery.className = 'event-review-photos';
+                        validPhotos.forEach((src, index) => {
+                            const image = document.createElement('img');
+                            image.src = src;
+                            image.alt = `Photo ${index + 1} shared with this event review`;
+                            image.loading = 'lazy';
+                            gallery.append(image);
+                        });
+                        card.append(gallery);
+                    }
+                    reviewList.append(card);
+                });
+            }
+
+            form.addEventListener('submit', async eventSubmit => {
+                eventSubmit.preventDefault();
+                if (form.hidden) return;
+                const submit = form.querySelector('button[type="submit"]');
+                const files = [...photoInput.files];
+                if (files.length > 3) {
+                    showToast('Choose up to three event photos.', 'info');
+                    return;
+                }
+                submit.disabled = true;
+                message.textContent = 'Preparing your review…';
+                try {
+                    const photos = [];
+                    for (const file of files) photos.push(await photoToDataUrl(file));
+                    const rating = Number(form.querySelector('input[name="rating"]:checked')?.value);
+                    const outcome = form.querySelector('input[name="outcome"]:checked')?.value;
+                    const comment = form.querySelector('[name="comment"]').value.trim();
+                    await submitEventReview(event.id, { rating, outcome, comment, photos });
+                    form.reset();
+                    paintStarPicker();
+                    form.querySelector('.review-photo-help').textContent = 'Photos are resized before upload. JPEG, PNG, or WebP.';
+                    message.textContent = 'Thanks — your review has been posted.';
+                    await refreshReviews();
+                } catch (err) {
+                    message.textContent = '';
+                    showToast(err.message || 'Could not post your review. Please try again.', 'info');
+                } finally {
+                    submit.disabled = false;
+                }
+            });
+
+            await refreshReviews();
+        }
+    </script>
+</body>
+ 
+</html>
+ 

@@ -1,0 +1,589 @@
+
+<!DOCTYPE html>
+<html lang="en">
+ 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Organizer dashboard — manage your events on SERVEO.">
+    <title>Organizer Dashboard — SERVEO</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/terms.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link rel="stylesheet" href="css/organizer.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+    <style>
+        /* Pending approval queue */
+        .pending-list { display: grid; gap: var(--space-md); }
+        .pending-card { padding: var(--space-lg); cursor: default; }
+        .pending-top { display: flex; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
+        .pending-card h3 { margin-bottom: 4px; }
+        .pending-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--text-secondary); margin: 8px 0; }
+        .pending-desc { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 10px; }
+        .pending-contact { font-size: 0.85rem; margin-bottom: 12px; }
+        .pending-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pending-empty { padding: var(--space-lg); color: var(--text-secondary); text-align: center; }
+        .pending-count { background: var(--accent-primary); color: #06231d; border-radius: 999px; padding: 2px 10px; font-size: 0.8rem; font-weight: 700; margin-left: 8px; }
+    
+        /* Auth Modal */
+        .auth-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 9999; }
+        .auth-modal-overlay.open { display: flex; }
+        .auth-modal { background: #141924; border: 1px solid #2a3142; border-radius: 16px; width: 90%; max-width: 440px; padding: 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); position: relative; }
+        .auth-modal-close { position: absolute; top: 16px; right: 18px; font-size: 1.5rem; background: none; border: none; color: #9ca3af; cursor: pointer; }
+        .auth-tabs { display: flex; gap: 8px; border-bottom: 1px solid #2a3142; margin-bottom: 20px; }
+        .auth-tab { background: none; border: none; padding: 8px 16px; font-size: 0.95rem; font-weight: 600; color: #9ca3af; cursor: pointer; border-bottom: 2px solid transparent; }
+        .auth-tab.active { color: #00d4aa; border-bottom-color: #00d4aa; }
+        .auth-form-group { margin-bottom: 14px; text-align: left; }
+        .auth-form-group label { display: block; font-size: 0.85rem; color: #9ca3af; margin-bottom: 5px; }
+        .auth-form-group input { width: 100%; box-sizing: border-box; padding: 10px 14px; border-radius: 8px; background: #0b0f19; border: 1px solid #2a3142; color: #fff; font-size: 0.95rem; }
+        .auth-form-group input:focus { border-color: #00d4aa; outline: none; }
+        .auth-row { display: flex; gap: 8px; }
+
+    </style>
+
+</head>
+ 
+<body>
+    <div class="ambient-bg"></div>
+    <div id="navbar-root"></div>
+ 
+    <div class="organizer-page">
+        <!-- Header -->
+        <div class="organizer-header">
+            <div class="container">
+                <div class="org-profile">
+                    <div class="org-avatar">🏥</div>
+                    <div class="org-info" style="flex: 1;">
+                        <h1 id="org-display-name">Indian Red Cross Society</h1>
+                        <p id="org-display-sub">Verified NGO · Managing 12 Active Events · Member since Jan 2026</p>
+                        <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+                            <span class="badge badge-verified" id="org-badge">✓ Verified Organization</span>
+                            <button id="open-auth-btn" class="btn btn-secondary btn-sm" style="margin-left:auto;">🔑 Organizer Login / Register</button>
+                            <button id="logout-btn" class="btn btn-secondary btn-sm" style="display:none; margin-left:auto;">🚪 Sign Out</button>
+                        </div>
+                        <div id="org-achievements" class="org-achievements" aria-live="polite"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+ 
+        <div class="container">
+            <!-- Dashboard Stats -->
+            <div class="dash-stats">
+                <div class="dash-stat glass-card">
+                    <div class="dash-stat-number">12</div>
+                    <div class="dash-stat-label">Active Events</div>
+                </div>
+                <div class="dash-stat glass-card">
+                    <div class="dash-stat-number">847</div>
+                    <div class="dash-stat-label">Total Volunteers</div>
+                </div>
+                <div class="dash-stat glass-card">
+                    <div class="dash-stat-number">4,200</div>
+                    <div class="dash-stat-label">Blood Units</div>
+                </div>
+                <div class="dash-stat glass-card">
+                    <div class="dash-stat-number">96%</div>
+                    <div class="dash-stat-label">Trust Score</div>
+                </div>
+            </div>
+ 
+            <!-- Pending approval (new events submitted from "Post an Event") -->
+            <div class="dash-section">
+                <div class="dash-section-header">
+                    <h2>🕐 Waiting for Approval <span class="pending-count" id="pending-count">0</span></h2>
+                </div>
+                <div class="pending-list" id="pending-list">
+                    <div class="pending-empty glass-card">Loading...</div>
+                </div>
+            </div>
+ 
+            <!-- Event Management -->
+            <div class="dash-section">
+                <div class="dash-section-header">
+                    <h2>📋 Your Events</h2>
+                    <a href="post-event.html" class="btn btn-primary btn-sm">+ New Event</a>
+                </div>
+ 
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th>Event</th>
+                            <th>Date</th>
+                            <th>City</th>
+                            <th>Volunteers</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="table-title">Emergency Blood Donation Camp</td>
+                            <td>Aug 21, 2026</td>
+                            <td>New Delhi</td>
+                            <td>87 / 200</td>
+                            <td><span class="table-status status-live">🟢 Live</span></td>
+                            <td class="table-actions">
+                                <a href="event-detail.html?id=1" class="btn btn-secondary btn-sm">View</a>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Free Medical Health Screening</td>
+                            <td>Aug 22, 2026</td>
+                            <td>New Delhi</td>
+                            <td>32 / 50</td>
+                            <td><span class="table-status status-upcoming">🔵 Upcoming</span></td>
+                            <td class="table-actions">
+                                <a href="event-detail.html?id=2" class="btn btn-secondary btn-sm">View</a>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Clothes & Blanket Collection</td>
+                            <td>Aug 21, 2026</td>
+                            <td>New Delhi</td>
+                            <td>28 / 40</td>
+                            <td><span class="table-status status-live">🟢 Live</span></td>
+                            <td class="table-actions">
+                                <a href="event-detail.html?id=14" class="btn btn-secondary btn-sm">View</a>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Earthquake Preparedness Workshop</td>
+                            <td>Aug 25, 2026</td>
+                            <td>New Delhi</td>
+                            <td>12 / 30</td>
+                            <td><span class="table-status status-upcoming">🔵 Upcoming</span></td>
+                            <td class="table-actions">
+                                <a href="event-detail.html?id=9" class="btn btn-secondary btn-sm">View</a>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Summer Blood Drive 2026</td>
+                            <td>Jul 15, 2026</td>
+                            <td>Mumbai</td>
+                            <td>200 / 200</td>
+                            <td><span class="table-status status-ended">⚫ Ended</span></td>
+                            <td class="table-actions">
+                                <button class="btn btn-secondary btn-sm">Report</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="table-title">Independence Day Clean-Up</td>
+                            <td>Aug 15, 2026</td>
+                            <td>New Delhi</td>
+                            <td>150 / 150</td>
+                            <td><span class="table-status status-ended">⚫ Ended</span></td>
+                            <td class="table-actions">
+                                <button class="btn btn-secondary btn-sm">Report</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+ 
+            <!-- Quick Actions -->
+            <div class="dash-section" style="display:flex; gap: var(--space-lg); flex-wrap: wrap;">
+                <div class="glass-card" style="flex:1; min-width:280px; padding: var(--space-xl); cursor:default;">
+                    <h3 style="margin-bottom: var(--space-md);">📊 Analytics (Coming Soon)</h3>
+                    <p>Advanced RSVP analytics, volunteer demographics, and impact reports will be available in Phase 3.
+                    </p>
+                    <button class="btn btn-secondary btn-sm" style="margin-top: var(--space-md);" disabled>Coming
+                        Soon</button>
+                </div>
+                <div class="glass-card" style="flex:1; min-width:280px; padding: var(--space-xl); cursor:default;">
+                    <h3 style="margin-bottom: var(--space-md);">👥 Multi-Admin (Coming Soon)</h3>
+                    <p>Invite team members, assign roles, and manage events collaboratively.</p>
+                    <button class="btn btn-secondary btn-sm" style="margin-top: var(--space-md);" disabled>Coming
+                        Soon</button>
+                </div>
+                <div class="glass-card" style="flex:1; min-width:280px; padding: var(--space-xl); cursor:default;">
+                    <h3 style="margin-bottom: var(--space-md);">🔔 Notifications (Coming Soon)</h3>
+                    <p>Push notifications to volunteers within your event radius when you post urgently.</p>
+                    <button class="btn btn-secondary btn-sm" style="margin-top: var(--space-md);" disabled>Coming
+                        Soon</button>
+                </div>
+            </div>
+        </div>
+    </div>
+ 
+    <div id="footer-root"></div>
+ 
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script defer src="js/legal-content.js"></script>
+    <script defer src="js/terms.js"></script>
+    <script>
+        document.getElementById('navbar-root').innerHTML = getNavbarHTML('');
+        document.getElementById('footer-root').innerHTML = getFooterHTML();
+    </script>
+ 
+    <!-- Approval queue (built with textContent, so submitted text can never run as code) -->
+    <script type="module">
+        import { watchPending, getContact, setEventStatus, removeEvent } from './js/db.js';
+        import { broadcastNewEvent } from './js/notifications.js';
+ 
+        const list = document.getElementById('pending-list');
+        const countEl = document.getElementById('pending-count');
+ 
+        function el(tag, className, text) {
+            const n = document.createElement(tag);
+            if (className) n.className = className;
+            if (text !== undefined) n.textContent = text;
+            return n;
+        }
+ 
+        function actionButton(label, className, handler) {
+            const b = el('button', 'btn btn-sm ' + className, label);
+            b.addEventListener('click', async () => {
+                b.disabled = true;
+                try { await handler(); }
+                catch (err) {
+                    b.disabled = false;
+                    if (err.message === 'cancelled') return;
+                    console.error(err); showToast('Action failed — try again', 'info');
+                }
+            });
+            return b;
+        }
+ 
+        async function buildCard(ev) {
+            const cat = getCategoryInfo(ev.category);
+            const card = el('div', 'pending-card glass-card');
+ 
+            const top = el('div', 'pending-top');
+            const left = el('div');
+            left.append(el('span', 'badge badge-upcoming', (cat ? cat.icon + ' ' + cat.label : ev.category)));
+            left.append(el('h3', '', ev.title));
+            left.append(el('div', '', 'by ' + ev.organizer));
+            top.append(left);
+            card.append(top);
+ 
+            const meta = el('div', 'pending-meta');
+            meta.append(
+                el('span', '', '📅 ' + ev.date + ', ' + ev.startTime + ' – ' + ev.endTime),
+                el('span', '', '📍 ' + ev.address + ' (' + ev.city + ')'),
+                el('span', '', '🙋 ' + ev.volunteersNeeded + ' volunteers needed')
+            );
+            card.append(meta);
+            card.append(el('p', 'pending-desc', ev.description));
+
+            const eventId = ev.id || ev._docId;
+            const c = await getContact(eventId);
+            const contact = el('div', 'pending-contact',
+                c ? '📞 ' + c.contact + '  ·  ✉️ ' + c.email + (c.orgType ? '  ·  ' + c.orgType : '')
+                  : 'No contact details found');
+            card.append(contact);
+
+            const actions = el('div', 'pending-actions');
+            actions.append(
+                actionButton('✓ Approve', 'btn-primary', async () => {
+                    await setEventStatus(eventId, { status: 'approved' });
+                    broadcastNewEvent({ ...ev, id: eventId, status: 'approved' });
+                    showToast('Event approved & 0-5km nearby alert sent');
+                }),
+                actionButton('✓ Approve + Verified badge', 'btn-secondary', async () => {
+                    await setEventStatus(eventId, { status: 'approved', verified: true });
+                    broadcastNewEvent({ ...ev, id: eventId, status: 'approved', verified: true });
+                    showToast('Approved with verified badge & alert sent');
+                }),
+                actionButton('✗ Reject', 'btn-secondary', async () => {
+                    await setEventStatus(eventId, { status: 'rejected' });
+                    showToast('Event rejected', 'info');
+                }),
+                actionButton('🗑 Delete', 'btn-secondary', async () => {
+                    if (!confirm('Delete this event permanently?')) throw new Error('cancelled');
+                    await removeEvent(eventId);
+                    showToast('Event deleted permanently', 'info');
+                })
+            );
+            card.append(actions);
+            return card;
+        }
+ 
+        watchPending(async (events) => {
+            countEl.textContent = events.length;
+            if (!events.length) {
+                list.replaceChildren(el('div', 'pending-empty glass-card', 'No events waiting for approval 🎉'));
+                return;
+            }
+            const cards = await Promise.all(events.map(buildCard));
+            list.replaceChildren(...cards);
+        }, (err) => {
+            console.error(err);
+            list.replaceChildren(el('div', 'pending-empty glass-card', 'Could not load pending events.'));
+        });
+    </script>
+
+    <script type="module">
+        import { getMe, getApprovedEvents } from './js/db.js';
+
+        const nameElement = document.getElementById('org-display-name');
+        const subtitle = document.getElementById('org-display-sub');
+        const achievements = document.getElementById('org-achievements');
+        const user = await getMe();
+        const organizationName = user?.name || nameElement.textContent.trim();
+        if (user?.name) nameElement.textContent = user.name;
+
+        let events;
+        try {
+            events = await getApprovedEvents();
+        } catch {
+            events = [];
+        }
+        if (!events.length) events = EVENTS_DATA;
+
+        const organizationEvents = events.filter(event =>
+            (user?.id && String(event.ownerId || '') === String(user.id)) ||
+            String(event.organizer || '').toLowerCase() === organizationName.toLowerCase()
+        );
+        const categories = [...new Set(organizationEvents.map(event => event.category).filter(Boolean))];
+        const sampleHostedCount = Number(organizationEvents.find(event => Number(event.sampleOrganizerHostedCount) > 0)?.sampleOrganizerHostedCount) || 0;
+        const hostedCount = sampleHostedCount || organizationEvents.length;
+        subtitle.textContent = `${user ? 'SERVEO organizer' : 'Demo organizer'} · ${sampleHostedCount ? `${hostedCount} sample hosted events` : `${hostedCount} approved events`}`;
+        achievements.innerHTML = organizerAchievementHTML(hostedCount, categories);
+    </script>
+
+    <!-- Auth Modal -->
+    <div class="auth-modal-overlay" id="auth-modal">
+        <div class="auth-modal">
+            <button class="auth-modal-close" id="close-auth-modal" aria-label="Close modal">&times;</button>
+            <div style="text-align: center; margin-bottom: 16px;">
+                <span style="font-size: 2rem;">🏥</span>
+                <h3 style="margin-top: 4px;">Organization Portal Login</h3>
+                <p style="color: var(--text-secondary); font-size: 0.85rem;">Access and manage your public-service initiatives</p>
+            </div>
+
+            <button type="button" class="btn btn-secondary btn-sm" id="modal-fast-org" style="width:100%; margin-bottom: 14px; background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); color: var(--accent-primary);">⚡ Fast 1-Click Login (Indian Red Cross Demo)</button>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login">Sign In</button>
+                <button class="auth-tab" id="tab-signup">Register New</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form">
+                <div class="auth-form-group">
+                    <label>Email, Username, or Indian Mobile (+91)</label>
+                    <input type="text" id="login-ident" placeholder="organizer@redcross.org, redcross, or +919876543210" required>
+                </div>
+                <div class="auth-form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-pass" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; margin-top:10px;" id="login-submit-btn">🔐 Sign In as Organizer</button>
+                <div style="text-align: center; margin-top: 14px;">
+                    <a href="login.html?role=organizer" style="font-size: 0.85rem; color: var(--accent-primary); text-decoration: none;">
+                        ↗ Prefer full page? Open Organization Login Page
+                    </a>
+                </div>
+            </form>
+
+            <!-- Signup Form -->
+            <form id="signup-form" style="display:none;">
+                <div class="auth-form-group">
+                    <label>Organization Name (or Representative Name) *</label>
+                    <input type="text" id="reg-name" placeholder="e.g. Indian Red Cross Society" required>
+                </div>
+                <div class="auth-form-group">
+                    <label>Organization Username *</label>
+                    <input type="text" id="reg-user" placeholder="e.g. redcross_delhi" required>
+                </div>
+                <div class="auth-form-group">
+                    <label>Official Email Address *</label>
+                    <input type="email" id="reg-email" placeholder="contact@organization.org" required>
+                </div>
+                <div class="auth-form-group">
+                    <label>Indian Mobile Number (+91) *</label>
+                    <div class="auth-row">
+                        <input type="tel" id="reg-phone" placeholder="+91 98765 43210" required>
+                        <button type="button" class="btn btn-secondary btn-sm" id="send-otp-btn" style="white-space:nowrap;">Send OTP</button>
+                    </div>
+                </div>
+                <div class="auth-form-group">
+                    <label>SMS Verification OTP *</label>
+                    <input type="text" id="reg-otp" placeholder="Enter 6-digit OTP (123456 in dev)" required>
+                </div>
+                <div class="auth-form-group">
+                    <label>Create Password *</label>
+                    <input type="password" id="reg-pass" placeholder="At least 6 characters" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; margin-top:10px;" id="reg-submit-btn">✅ Register Organization Account</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Organizer Auth Controller Script -->
+    <script type="module">
+        import { login, signup, sendOtp, quickLogin, logout, getMe } from './js/db.js';
+
+        const authModal = document.getElementById('auth-modal');
+        const openAuthBtn = document.getElementById('open-auth-btn');
+        const closeAuthBtn = document.getElementById('close-auth-modal');
+        const logoutBtn = document.getElementById('logout-btn');
+        const tabLogin = document.getElementById('tab-login');
+        const tabSignup = document.getElementById('tab-signup');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const nameEl = document.getElementById('org-display-name');
+        const subEl = document.getElementById('org-display-sub');
+
+        function openModal() {
+            if (authModal) authModal.classList.add('open');
+        }
+        function closeModal() {
+            if (authModal) authModal.classList.remove('open');
+        }
+
+        openAuthBtn?.addEventListener('click', openModal);
+        closeAuthBtn?.addEventListener('click', closeModal);
+        authModal?.addEventListener('click', (e) => {
+            if (e.target === authModal) closeModal();
+        });
+
+        // Check if URL has ?auth=1 or #login
+        if (window.location.search.includes('auth=1') || window.location.hash === '#login') {
+            openModal();
+        }
+
+        tabLogin?.addEventListener('click', () => {
+            tabLogin.classList.add('active');
+            tabSignup.classList.remove('active');
+            loginForm.style.display = 'block';
+            signupForm.style.display = 'none';
+        });
+
+        tabSignup?.addEventListener('click', () => {
+            tabSignup.classList.add('active');
+            tabLogin.classList.remove('active');
+            signupForm.style.display = 'block';
+            loginForm.style.display = 'none';
+        });
+
+        // Check current auth status on load
+        async function checkAuth() {
+            try {
+                const user = await getMe();
+                if (user) {
+                    if (nameEl) nameEl.textContent = user.name;
+                    if (subEl) subEl.textContent = `Signed in as @${user.username} (${user.email || user.phone}) · Verified Organizer`;
+                    if (openAuthBtn) openAuthBtn.style.display = 'none';
+                    if (logoutBtn) logoutBtn.style.display = 'inline-block';
+                } else {
+                    if (openAuthBtn) openAuthBtn.style.display = 'inline-block';
+                    if (logoutBtn) logoutBtn.style.display = 'none';
+                }
+            } catch (e) {
+                console.warn('Auth check error:', e);
+            }
+        }
+        checkAuth();
+
+        // Fast 1-click organizer login inside modal
+        document.getElementById('modal-fast-org')?.addEventListener('click', async () => {
+            try {
+                try {
+                    const res = await quickLogin('organizer');
+                    showToast(`⚡ Welcome ${res.user.name}!`);
+                    closeModal();
+                    checkAuth();
+                    setTimeout(() => window.location.reload(), 500);
+                } catch {
+                    const res = await login('organizer@redcross.org', 'Password123!');
+                    showToast(`⚡ Signed in as ${res.user.name}!`);
+                    closeModal();
+                    checkAuth();
+                    setTimeout(() => window.location.reload(), 500);
+                }
+            } catch (err) {
+                showToast('Please enter your credentials below.', 'info');
+            }
+        });
+
+        // Handle login submit
+        loginForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = document.getElementById('login-submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Signing in...';
+            const ident = document.getElementById('login-ident').value.trim();
+            const pass = document.getElementById('login-pass').value;
+
+            try {
+                const res = await login(ident, pass);
+                showToast(`Welcome ${res.user.name}!`);
+                closeModal();
+                checkAuth();
+                setTimeout(() => window.location.reload(), 500);
+            } catch (err) {
+                showToast(err.message || 'Login failed', 'info');
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🔐 Sign In as Organizer';
+            }
+        });
+
+        // Handle Send OTP
+        const sendOtpBtn = document.getElementById('send-otp-btn');
+        sendOtpBtn?.addEventListener('click', async () => {
+            const phone = document.getElementById('reg-phone').value.trim();
+            if (!phone) return showToast('Please enter an Indian mobile number (+91...)', 'info');
+            sendOtpBtn.disabled = true;
+            sendOtpBtn.textContent = 'Sending...';
+            try {
+                const res = await sendOtp(phone);
+                showToast(res.message || 'OTP sent successfully!');
+                if (res.simulated) {
+                    document.getElementById('reg-otp').value = '123456';
+                }
+            } catch (err) {
+                showToast(err.message, 'info');
+            } finally {
+                sendOtpBtn.disabled = false;
+                sendOtpBtn.textContent = 'Send OTP';
+            }
+        });
+
+        // Handle register submit
+        signupForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const regBtn = document.getElementById('reg-submit-btn');
+            regBtn.disabled = true;
+            regBtn.textContent = 'Registering...';
+
+            const data = {
+                name: document.getElementById('reg-name').value.trim(),
+                username: document.getElementById('reg-user').value.trim(),
+                email: document.getElementById('reg-email').value.trim(),
+                phone: document.getElementById('reg-phone').value.trim(),
+                code: document.getElementById('reg-otp').value.trim(),
+                password: document.getElementById('reg-pass').value
+            };
+
+            try {
+                const res = await signup(data);
+                showToast(`🎉 Organization account created! Welcome ${res.user.name}!`);
+                closeModal();
+                checkAuth();
+                setTimeout(() => window.location.reload(), 500);
+            } catch (err) {
+                showToast(err.message || 'Registration failed', 'info');
+                regBtn.disabled = false;
+                regBtn.textContent = '✅ Register Organization Account';
+            }
+        });
+
+        // Handle logout
+        logoutBtn?.addEventListener('click', async () => {
+            await logout();
+            showToast('Signed out of organizer dashboard.');
+            setTimeout(() => window.location.reload(), 500);
+        });
+    </script>
+</body>
+ 
+</html>
