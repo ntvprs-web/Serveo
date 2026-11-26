@@ -13,6 +13,7 @@ const rateLimit = require('express-rate-limit');
 const PDFDocument = require('pdfkit');
 
 const db = require('./db');
+const { verifyFirebaseIdToken } = require('./firebase-admin');
 const {
   normalizeIndianPhone,
   isValidIndianPhone,
@@ -38,11 +39,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://api.mapbox.com", "https://cdnjs.cloudflare.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://api.mapbox.com", "https://cdnjs.cloudflare.com", "https://www.google.com", "https://www.gstatic.com", "https://apis.google.com"],
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://api.mapbox.com", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https://api.mapbox.com", "https://*.mapbox.com", "https://*.tile.openstreetmap.org", "https://images.unsplash.com"],
-      connectSrc: ["'self'", "https://api.mapbox.com", "https://*.mapbox.com", "https://events.mapbox.com", "https://india-lgd-index-api.vercel.app", "http://localhost:*", "http://127.0.0.1:*"],
+      imgSrc: ["'self'", "data:", "blob:", "https://api.mapbox.com", "https://*.mapbox.com", "https://*.tile.openstreetmap.org", "https://images.unsplash.com", "https://www.gstatic.com"],
+      connectSrc: ["'self'", "https://api.mapbox.com", "https://*.mapbox.com", "https://events.mapbox.com", "https://india-lgd-index-api.vercel.app", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://*.googleapis.com", "http://localhost:*", "http://127.0.0.1:*"],
+      frameSrc: ["'self'", "https://*.firebaseapp.com", "https://www.google.com"],
       workerSrc: ["'self'", "blob:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       objectSrc: ["'none'"]
@@ -414,6 +416,104 @@ app.post('/api/auth/login-otp', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'OTP_LOGIN_FAILED', message: err.message });
+  }
+});
+
+// Firebase Phone + Email verified authentication bridge
+app.post('/api/auth/firebase', async (req, res) => {
+  try {
+    const { idToken, mode = 'login', name, username, password, bloodGroup } = req.body || {};
+    if (!idToken) {
+      return res.status(400).json({ error: 'MISSING_ID_TOKEN', message: 'Firebase ID token is required.' });
+    }
+
+    const decoded = await verifyFirebaseIdToken(idToken);
+    const verifiedPhone = decoded.phone_number ? normalizeIndianPhone(decoded.phone_number) : null;
+    const verifiedEmail = decoded.email && decoded.email_verified ? String(decoded.email).trim().toLowerCase() : null;
+
+    if (mode === 'login') {
+      const user = (verifiedPhone && await db.findUserByIdentifier(verifiedPhone)) ||
+                   (verifiedEmail && await db.findUserByIdentifier(verifiedEmail));
+      if (!user) {
+        return res.status(404).json({
+          error: 'USER_NOT_FOUND',
+          message: 'No SERVEO account is linked to this verified phone/email yet. Please register first.'
+        });
+      }
+      if (user.organizationBanned) {
+        return res.status(403).json({
+          error: 'ACCOUNT_BANNED',
+          message: 'This organizer account has been suspended due to verified community false-alarm reviews.'
+        });
+      }
+      const token = generateToken(user);
+      setAuthCookie(res, token);
+      return res.json({
+        success: true,
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          phone: user.phone,
+          bloodGroup: user.bloodGroup || null,
+          isAdmin: user.isAdmin,
+          organizationBanned: user.organizationBanned
+        },
+        token
+      });
+    }
+
+    // Registration via Firebase requires BOTH verified email and verified +91 mobile
+    if (!verifiedEmail) {
+      return res.status(400).json({ error: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email address via Firebase first.' });
+    }
+    if (!verifiedPhone || !isValidIndianPhone(verifiedPhone)) {
+      return res.status(400).json({ error: 'PHONE_NOT_VERIFIED', message: 'Please verify your 10-digit +91 mobile number via SMS OTP first.' });
+    }
+    if (!name || !username || !password || password.length < 6) {
+      return res.status(400).json({ error: 'MISSING_FIELDS', message: 'Full name, username, and password (min 6 chars) are required.' });
+    }
+
+    const existing = await db.findUserByIdentifier(verifiedEmail) ||
+                     await db.findUserByIdentifier(username.trim()) ||
+                     await db.findUserByIdentifier(verifiedPhone);
+    if (existing) {
+      return res.status(409).json({ error: 'USER_EXISTS', message: 'An account with this email, username, or phone already exists.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await db.createUser({
+      name: name.trim(),
+      username: username.trim().toLowerCase(),
+      email: verifiedEmail,
+      phone: verifiedPhone,
+      passwordHash,
+      bloodGroup: bloodGroup || null
+    });
+
+    const token = generateToken(user);
+    setAuthCookie(res, token);
+    return res.status(201).json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        bloodGroup: user.bloodGroup || null,
+        isAdmin: user.isAdmin,
+        organizationBanned: user.organizationBanned
+      },
+      token
+    });
+  } catch (err) {
+    if (err.code === 'FIREBASE_ADMIN_NOT_CONFIGURED') {
+      return res.status(503).json({ error: err.code, message: err.message });
+    }
+    console.error('Firebase auth error:', err);
+    res.status(401).json({ error: 'FIREBASE_AUTH_FAILED', message: err.message || 'Firebase token verification failed.' });
   }
 });
 

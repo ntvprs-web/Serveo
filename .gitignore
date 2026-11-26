@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+backend/firebase-service-account.json
+*firebase-adminsdk*.json
 node_modules/
 .snapshots/
 backend/data/serveo-db.json
