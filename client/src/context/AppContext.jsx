@@ -111,13 +111,23 @@ export function AppProvider({ children }) {
       body: JSON.stringify({
         name: details.name,
         email: details.email,
-        phone: details.phone
+        phone: details.phone,
+        otpCode: details.otpCode,
+        organizationName: details.organizationName || '',
+        plan: details.plan || 'monthly',
+        paymentReference: details.paymentReference || ''
       })
     });
-    localStorage.setItem('serveo_premium_customer', JSON.stringify(details));
+    localStorage.setItem('serveo_premium_customer', JSON.stringify({
+      name: details.name,
+      email: details.email,
+      phone: details.phone,
+      organizationName: details.organizationName || '',
+      plan: details.plan || 'monthly'
+    }));
     localStorage.setItem('serveo_premium_status', 'active');
     setIsPremium(true);
-    addToast('SERVEO Premium activated & saved! 25 km–100 km alerts & verified perks unlocked.');
+    addToast('SERVEO Premium activated & verified! 25 km–100 km alerts & verified perks unlocked.');
   }, [addToast]);
 
   useEffect(() => {
@@ -376,32 +386,47 @@ export function AppProvider({ children }) {
   const ownedBadges = useMemo(() => badgeRecords.map(b => b.badgeKey), [badgeRecords]);
   const equippedBadges = useMemo(() => badgeRecords.filter(b => b.equipped !== false).map(b => b.badgeKey), [badgeRecords]);
 
-  const buyBadge = useCallback(async (badgeKey, label, priceInr = 49) => {
-    const userKey = String(user?.id || user?.username || 'guest');
-    if (ownedBadges.includes(badgeKey)) return;
-    if (user) {
-      try {
-        const res = await apiFetch('/api/badges/purchase', {
-          method: 'POST',
-          body: JSON.stringify({ badgeKey, priceInr })
-        });
-        if (res && Array.isArray(res.badges)) {
-          setBadgeRecords(res.badges);
-          localStorage.setItem(`serveo_category_badges_${userKey}`, JSON.stringify(res.badges.map(x => x.badgeKey)));
-          refreshEvents();
-          addToast(`"${label}" Verified Badge unlocked & equipped! Priority listing & perks are active.`);
-          return;
-        }
-      } catch (err) {
-        addToast(err.message || 'Could not save badge purchase');
-        return;
-      }
+  const buyBadge = useCallback(async ({
+    badgeKey,
+    label,
+    priceInr = 49,
+    buyerName,
+    buyerEmail,
+    buyerPhone,
+    organizationName,
+    paymentMethod = 'upi',
+    paymentReference,
+    otpCode
+  }) => {
+    if (!user) {
+      addToast('Please sign in first to purchase and verify an Organizer Badge.');
+      return false;
     }
-    const next = [...badgeRecords, { badgeKey, equipped: true, priceInr }];
-    setBadgeRecords(next);
-    localStorage.setItem(`serveo_category_badges_${userKey}`, JSON.stringify(next.map(x => x.badgeKey)));
-    addToast(`"${label}" Verified Badge unlocked & equipped! (Demo checkout)`);
-  }, [user, ownedBadges, badgeRecords, addToast, refreshEvents]);
+    if (ownedBadges.includes(badgeKey)) return false;
+    const res = await apiFetch('/api/badges/purchase', {
+      method: 'POST',
+      body: JSON.stringify({
+        badgeKey,
+        priceInr,
+        buyerName,
+        buyerEmail,
+        buyerPhone,
+        organizationName,
+        paymentMethod,
+        paymentReference,
+        otpCode
+      })
+    });
+    if (res && Array.isArray(res.badges)) {
+      setBadgeRecords(res.badges);
+      const userKey = String(user.id || user.username || 'user');
+      localStorage.setItem(`serveo_category_badges_${userKey}`, JSON.stringify(res.badges.map(x => x.badgeKey)));
+      refreshEvents();
+      addToast(`"${label}" Verified Badge unlocked & equipped! Priority listing & perks are active.`);
+      return true;
+    }
+    return false;
+  }, [user, ownedBadges, addToast, refreshEvents]);
 
   const toggleEquipBadge = useCallback(async (badgeKey) => {
     const existing = badgeRecords.find(b => b.badgeKey === badgeKey);

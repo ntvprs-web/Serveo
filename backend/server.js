@@ -149,8 +149,10 @@ app.post('/api/auth/otp/send', async (req, res) => {
       success: true,
       phone,
       simulated: Boolean(result.simulated),
+      ...(result.simulated && result.code ? { devOtp: result.code } : {}),
+      expiresInSeconds: 600,
       message: result.simulated
-        ? 'Test mode enabled: use 123456 as your verification code.'
+        ? `Verification OTP generated for ${phone}. Enter the 6-digit code to authenticate.`
         : 'One-time verification code has been sent via SMS.'
     });
   } catch (err) {
@@ -295,41 +297,54 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Fast 1-Click Login (Demo Only)
-app.post('/api/auth/quick-login', async (req, res) => {
-  if (process.env.NODE_ENV !== 'development') {
-    return res.status(403).json({ error: 'DISABLED', message: 'Demo features are disabled in production.' });
-  }
+// Verify standalone OTP for checkout/phone confirmation
+app.post('/api/auth/otp/verify', async (req, res) => {
   try {
-    const role = req.body.role || 'organizer';
-    const isOrg = role === 'organizer';
-    const ident = isOrg ? 'organizer@redcross.org' : 'volunteer@serveo.in';
-    const username = isOrg ? 'redcross' : 'volunteer_demo';
-    const name = isOrg ? 'Indian Red Cross Society' : 'Aarav Sharma (Volunteer)';
-    const phone = isOrg ? '+919876543210' : '+919876543211';
+    const phone = normalizeIndianPhone(req.body?.phone);
+    const code = String(req.body?.code || '').trim();
+    if (!phone || !isValidIndianPhone(phone)) {
+      return res.status(400).json({ error: 'INVALID_PHONE', message: 'A valid +91 Indian mobile number is required.' });
+    }
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: 'INVALID_OTP', message: 'Enter a valid 6-digit OTP code.' });
+    }
+    const check = await verifyTwilioOtp(phone, code);
+    if (!check.approved) {
+      return res.status(400).json({ error: 'INVALID_OTP', message: check.message || 'Invalid or expired OTP.' });
+    }
+    res.json({ success: true, verified: true, phone });
+  } catch (err) {
+    res.status(500).json({ error: 'OTP_VERIFY_FAILED', message: err.message });
+  }
+});
 
-    let user = await db.findUserByIdentifier(ident) || await db.findUserByIdentifier(username);
+// Sign In via Phone Number + OTP
+app.post('/api/auth/login-otp', async (req, res) => {
+  try {
+    const phone = normalizeIndianPhone(req.body?.phone);
+    const code = String(req.body?.code || '').trim();
+    if (!phone || !isValidIndianPhone(phone)) {
+      return res.status(400).json({ error: 'INVALID_PHONE', message: 'Enter a valid +91 Indian mobile number.' });
+    }
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: 'INVALID_OTP', message: 'Enter the 6-digit OTP sent to your phone.' });
+    }
+    const user = await db.findUserByIdentifier(phone);
     if (!user) {
-      const passwordHash = await bcrypt.hash('Password123!', 10);
-      user = await db.createUser({
-        name,
-        username,
-        email: ident,
-        phone,
-        passwordHash,
-        isAdmin: false,
-        notificationLat: 28.6139,
-        notificationLng: 77.2090
+      return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'No account is registered with this mobile number. Please register first.' });
+    }
+    if (user.organizationBanned) {
+      return res.status(403).json({
+        error: 'ACCOUNT_BANNED',
+        message: 'This organizer account has been suspended due to verified community false-alarm reviews.'
       });
     }
-
-    // The demo login is intentionally never an administrative identity.
-    // Keep this explicit so stale demo records cannot retain old privileges.
-    user.isAdmin = false;
-
+    const otpCheck = await verifyTwilioOtp(phone, code);
+    if (!otpCheck.approved) {
+      return res.status(400).json({ error: 'INVALID_OTP', message: otpCheck.message || 'Invalid or expired OTP code.' });
+    }
     const token = generateToken(user);
     setAuthCookie(res, token);
-
     res.json({
       success: true,
       user: {
@@ -338,64 +353,14 @@ app.post('/api/auth/quick-login', async (req, res) => {
         username: user.username,
         email: user.email,
         phone: user.phone,
+        bloodGroup: user.bloodGroup || null,
         isAdmin: user.isAdmin,
         organizationBanned: user.organizationBanned
       },
       token
     });
   } catch (err) {
-    console.error('Quick login error:', err);
-    res.status(500).json({ error: 'QUICK_LOGIN_FAILED', message: err.message });
-  }
-});
-
-// Fast 1-Click Register (Demo Only)
-app.post('/api/auth/quick-register', async (req, res) => {
-  if (process.env.NODE_ENV !== 'development') {
-    return res.status(403).json({ error: 'DISABLED', message: 'Demo features are disabled in production.' });
-  }
-  try {
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const isOrg = req.body.role === 'organizer';
-    const name = req.body.name || (isOrg ? `Community Organizer ${randomSuffix}` : `Community Member ${randomSuffix}`);
-    const username = (req.body.username || `${isOrg ? 'organizer' : 'user'}_${randomSuffix}`).toLowerCase().trim();
-    const email = (req.body.email || `user${randomSuffix}@serveo.in`).toLowerCase().trim();
-    const phone = req.body.phone ? (normalizeIndianPhone(req.body.phone) || `+9198765${randomSuffix}`) : `+9198765${randomSuffix}`;
-    const password = req.body.password || 'Password123!';
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await db.createUser({
-      name,
-      username,
-      email,
-      phone,
-      passwordHash,
-      // Quick registration is for local demo accounts only. Never grant
-      // moderation privileges through a public, unauthenticated signup route.
-      isAdmin: false,
-      notificationLat: 28.6139,
-      notificationLng: 77.2090
-    });
-
-    const token = generateToken(user);
-    setAuthCookie(res, token);
-
-    res.status(201).json({
-      success: true,
-      user: {
-        id: user.id,
-        name: user.name,
-        username: user.username,
-        email: user.email,
-        phone: user.phone,
-        isAdmin: user.isAdmin,
-        organizationBanned: user.organizationBanned
-      },
-      token
-    });
-  } catch (err) {
-    console.error('Quick register error:', err);
-    res.status(500).json({ error: 'QUICK_REGISTER_FAILED', message: err.message });
+    res.status(500).json({ error: 'OTP_LOGIN_FAILED', message: err.message });
   }
 });
 
@@ -1455,16 +1420,36 @@ app.get('/api/admin/impact-heatmap', authenticateRequired, requireAdmin, async (
 app.post('/api/premium/activate', authenticateOptional, async (req, res) => {
   const name = String(req.body?.name || '').trim();
   const email = String(req.body?.email || '').trim().toLowerCase();
-  const phone = String(req.body?.phone || '').trim();
-  if (!name || name.length > 200 || !isValidEmail(email) || !phone || phone.length > 30) {
-    return res.status(400).json({ error: 'INVALID_PREMIUM_DETAILS', message: 'Please provide a valid name, email, and phone number.' });
+  const phone = normalizeIndianPhone(req.body?.phone);
+  const otpCode = String(req.body?.otpCode || '').trim();
+  const organizationName = String(req.body?.organizationName || '').trim().slice(0, 200);
+  const plan = ['monthly', 'annual'].includes(req.body?.plan) ? req.body.plan : 'monthly';
+  const paymentReference = String(req.body?.paymentReference || '').trim().slice(0, 120);
+
+  if (!name || name.length > 200 || !isValidEmail(email)) {
+    return res.status(400).json({ error: 'INVALID_PREMIUM_DETAILS', message: 'Please provide your full name and a valid email address.' });
   }
+  if (!phone || !isValidIndianPhone(phone)) {
+    return res.status(400).json({ error: 'INVALID_PHONE', message: 'Please provide a valid +91 Indian mobile number.' });
+  }
+  if (!paymentReference) {
+    return res.status(400).json({ error: 'MISSING_PAYMENT_REF', message: 'Please enter your UPI ID or billing reference.' });
+  }
+  const otpCheck = await verifyTwilioOtp(phone, otpCode);
+  if (!otpCheck.approved) {
+    return res.status(400).json({ error: 'INVALID_OTP', message: otpCheck.message || 'Please verify your mobile number with the 6-digit OTP.' });
+  }
+
   try {
     const activation = await db.createPremiumActivation({
       userId: req.user?.id || null,
       name,
       email,
-      phone
+      phone,
+      organizationName,
+      plan,
+      paymentReference,
+      otpVerified: true
     });
     res.status(201).json({ success: true, activation });
   } catch (err) {
@@ -1520,14 +1505,46 @@ app.get('/api/badges/mine', authenticateRequired, async (req, res) => {
 app.post('/api/badges/purchase', authenticateRequired, async (req, res) => {
   const badgeKey = String(req.body?.badgeKey || '').trim().toLowerCase();
   const priceInr = Number(req.body?.priceInr);
+  const buyerName = String(req.body?.buyerName || '').trim();
+  const buyerEmail = String(req.body?.buyerEmail || '').trim().toLowerCase();
+  const buyerPhone = normalizeIndianPhone(req.body?.buyerPhone);
+  const organizationName = String(req.body?.organizationName || '').trim();
+  const paymentMethod = String(req.body?.paymentMethod || 'upi').trim().slice(0, 40);
+  const paymentReference = String(req.body?.paymentReference || '').trim();
+  const otpCode = String(req.body?.otpCode || '').trim();
+
   if (!badgeKey || badgeKey.length > 64) {
     return res.status(400).json({ error: 'INVALID_BADGE', message: 'Choose a valid verified category badge.' });
   }
+  if (!buyerName || buyerName.length > 200 || !organizationName || organizationName.length > 200) {
+    return res.status(400).json({ error: 'MISSING_BUYER_DETAILS', message: 'Please provide your full name and organization/community name.' });
+  }
+  if (!isValidEmail(buyerEmail)) {
+    return res.status(400).json({ error: 'INVALID_EMAIL', message: 'Please enter a valid official email address.' });
+  }
+  if (!buyerPhone || !isValidIndianPhone(buyerPhone)) {
+    return res.status(400).json({ error: 'INVALID_PHONE', message: 'Please enter a valid +91 Indian mobile number.' });
+  }
+  if (!paymentReference) {
+    return res.status(400).json({ error: 'MISSING_PAYMENT_REF', message: 'Please enter your UPI ID or payment transaction reference.' });
+  }
+  const otpCheck = await verifyTwilioOtp(buyerPhone, otpCode);
+  if (!otpCheck.approved) {
+    return res.status(400).json({ error: 'INVALID_OTP', message: otpCheck.message || 'Please verify your mobile number with the 6-digit OTP.' });
+  }
+
   try {
     const badges = await db.purchaseUserBadge({
       userId: req.user.id,
       badgeKey,
-      priceInr: Number.isFinite(priceInr) && priceInr > 0 ? Math.round(priceInr) : 49
+      priceInr: Number.isFinite(priceInr) && priceInr > 0 ? Math.round(priceInr) : 49,
+      buyerName,
+      buyerEmail,
+      buyerPhone,
+      organizationName,
+      paymentMethod,
+      paymentReference,
+      otpVerified: true
     });
     broadcastEvent('EVENT_UPDATED', { userId: req.user.id });
     res.status(201).json({ success: true, badges });

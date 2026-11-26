@@ -379,9 +379,15 @@ CREATE TABLE IF NOT EXISTS premium_activations (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     phone VARCHAR(30) NOT NULL,
-    plan VARCHAR(50) NOT NULL DEFAULT 'demo_premium',
+    organization_name VARCHAR(255) DEFAULT '',
+    plan VARCHAR(50) NOT NULL DEFAULT 'monthly',
+    payment_reference VARCHAR(120) DEFAULT '',
+    otp_verified BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE premium_activations ADD COLUMN IF NOT EXISTS organization_name VARCHAR(255) DEFAULT '';
+ALTER TABLE premium_activations ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(120) DEFAULT '';
+ALTER TABLE premium_activations ADD COLUMN IF NOT EXISTS otp_verified BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_premium_activations_email ON premium_activations(email, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS website_inquiries (
@@ -420,7 +426,21 @@ CREATE TABLE IF NOT EXISTS user_badges (
     badge_key VARCHAR(64) NOT NULL,
     equipped BOOLEAN NOT NULL DEFAULT TRUE,
     price_inr INTEGER NOT NULL DEFAULT 49,
+    buyer_name VARCHAR(255),
+    buyer_email VARCHAR(255),
+    buyer_phone VARCHAR(30),
+    organization_name VARCHAR(255),
+    payment_method VARCHAR(40) DEFAULT 'upi',
+    payment_reference VARCHAR(120) DEFAULT '',
+    otp_verified BOOLEAN NOT NULL DEFAULT FALSE,
     purchased_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, badge_key)
 );
+ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS buyer_name VARCHAR(255);
+ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS buyer_email VARCHAR(255);
+ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS buyer_phone VARCHAR(30);
+ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS organization_name VARCHAR(255);
+ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS payment_method VARCHAR(40) DEFAULT 'upi';
+ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(120) DEFAULT '';
+ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS otp_verified BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_user_badges_user_equipped ON user_badges(user_id, equipped);

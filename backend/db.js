@@ -1984,15 +1984,24 @@ class DatabaseManager {
     };
   }
 
-  async createPremiumActivation({ userId = null, name, email, phone, plan = 'demo_premium' }) {
+  async createPremiumActivation({
+    userId = null,
+    name,
+    email,
+    phone,
+    organizationName = '',
+    plan = 'monthly',
+    paymentReference = '',
+    otpVerified = false
+  }) {
     const id = `prem_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const createdAt = new Date().toISOString();
     if (this.mode === 'postgres') {
       const { rows } = await this.pool.query(
-        `INSERT INTO premium_activations (id, user_id, name, email, phone, plan, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, user_id, name, email, phone, plan, created_at`,
-        [id, userId || null, name, email, phone, plan, createdAt]
+        `INSERT INTO premium_activations (id, user_id, name, email, phone, organization_name, plan, payment_reference, otp_verified, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING id, user_id, name, email, phone, organization_name, plan, payment_reference, otp_verified, created_at`,
+        [id, userId || null, name, email, phone, organizationName || '', plan, paymentReference || '', Boolean(otpVerified), createdAt]
       );
       if (userId) {
         await this.pool.query(
@@ -2001,9 +2010,31 @@ class DatabaseManager {
         );
       }
       const r = rows[0];
-      return { id: r.id, userId: r.user_id, name: r.name, email: r.email, phone: r.phone, plan: r.plan, createdAt: r.created_at };
+      return {
+        id: r.id,
+        userId: r.user_id,
+        name: r.name,
+        email: r.email,
+        phone: r.phone,
+        organizationName: r.organization_name,
+        plan: r.plan,
+        paymentReference: r.payment_reference,
+        otpVerified: Boolean(r.otp_verified),
+        createdAt: r.created_at
+      };
     }
-    const record = { id, userId: userId || null, name, email, phone, plan, createdAt };
+    const record = {
+      id,
+      userId: userId || null,
+      name,
+      email,
+      phone,
+      organizationName: organizationName || '',
+      plan,
+      paymentReference: paymentReference || '',
+      otpVerified: Boolean(otpVerified),
+      createdAt
+    };
     this.fallbackData.premium_activations.push(record);
     if (userId) {
       const u = this.fallbackData.users.find(x => x.id === userId);
@@ -2081,15 +2112,30 @@ class DatabaseManager {
       }));
   }
 
-  async purchaseUserBadge({ userId, badgeKey, priceInr = 49 }) {
+  async purchaseUserBadge({
+    userId,
+    badgeKey,
+    priceInr = 49,
+    buyerName = '',
+    buyerEmail = '',
+    buyerPhone = '',
+    organizationName = '',
+    paymentMethod = 'upi',
+    paymentReference = '',
+    otpVerified = false
+  }) {
     const id = `badge_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const purchasedAt = new Date().toISOString();
     if (this.mode === 'postgres') {
       await this.pool.query(
-        `INSERT INTO user_badges (id, user_id, badge_key, equipped, price_inr, purchased_at)
-         VALUES ($1, $2, $3, TRUE, $4, $5)
+        `INSERT INTO user_badges (id, user_id, badge_key, equipped, price_inr, buyer_name, buyer_email, buyer_phone, organization_name, payment_method, payment_reference, otp_verified, purchased_at)
+         VALUES ($1, $2, $3, TRUE, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (user_id, badge_key) DO NOTHING`,
-        [id, String(userId), String(badgeKey), Number(priceInr) || 49, purchasedAt]
+        [
+          id, String(userId), String(badgeKey), Number(priceInr) || 49,
+          buyerName, buyerEmail, buyerPhone, organizationName,
+          paymentMethod || 'upi', paymentReference || '', Boolean(otpVerified), purchasedAt
+        ]
       );
       return this.getUserBadges(userId);
     }
@@ -2104,6 +2150,13 @@ class DatabaseManager {
         badgeKey: String(badgeKey),
         equipped: true,
         priceInr: Number(priceInr) || 49,
+        buyerName,
+        buyerEmail,
+        buyerPhone,
+        organizationName,
+        paymentMethod: paymentMethod || 'upi',
+        paymentReference: paymentReference || '',
+        otpVerified: Boolean(otpVerified),
         purchasedAt
       });
       this.saveFallback();

@@ -1,11 +1,97 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Award, ShoppingBag, Clock, Sparkles, CheckCircle2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Award, ShoppingBag, Clock, Sparkles, CheckCircle2, Eye, EyeOff, ShieldCheck, Phone, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { apiFetch } from '../utils/api';
 import { CATEGORIES, BADGE_OVERVIEW_BENEFITS, getBadgeDetails, ORGANIZER_STAR_TIERS } from '../utils/constants';
 
+const EMAIL_RE = /^[a-z0-9](?:[a-z0-9._%+-]*[a-z0-9])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
+
 export default function BadgesShopPage() {
-  const { user, ownedBadges, equippedBadges, buyBadge, toggleEquipBadge } = useApp();
+  const { user, ownedBadges, equippedBadges, buyBadge, toggleEquipBadge, addToast } = useApp();
+  const navigate = useNavigate();
+
+  const [checkoutBadge, setCheckoutBadge] = useState(null); // { key, label, price }
+  const [buyerName, setBuyerName] = useState(user?.name || '');
+  const [organizationName, setOrganizationName] = useState(user?.name || '');
+  const [buyerEmail, setBuyerEmail] = useState(user?.email || '');
+  const [buyerPhone, setBuyerPhone] = useState(user?.phone || '');
+  const [paymentMethod, setPaymentMethod] = useState('upi');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [previewOtp, setPreviewOtp] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const emailInvalid = buyerEmail.trim().length > 0 && !EMAIL_RE.test(buyerEmail.trim());
+
+  const openCheckout = (cat, price) => {
+    if (!user) {
+      addToast('Please sign in first to purchase and verify an Organizer Badge.');
+      navigate('/login');
+      return;
+    }
+    setBuyerName(user.name || '');
+    setOrganizationName(user.name || '');
+    setBuyerEmail(user.email || '');
+    setBuyerPhone(user.phone || '');
+    setPaymentReference('');
+    setOtpCode('');
+    setOtpSent(false);
+    setPreviewOtp('');
+    setCheckoutBadge({ key: cat.key, label: cat.label, price, emoji: cat.emoji });
+  };
+
+  const handleSendOtp = async () => {
+    setSendingOtp(true);
+    try {
+      const res = await apiFetch('/api/auth/otp/send', {
+        method: 'POST',
+        body: JSON.stringify({ phone: buyerPhone })
+      });
+      setOtpSent(true);
+      setPreviewOtp(res.devOtp || '');
+      addToast(res.message || '6-digit OTP sent to your mobile.');
+    } catch (err) {
+      addToast(err.message || 'Enter a valid +91 Indian mobile number.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleCheckoutSubmit = async (e) => {
+    e.preventDefault();
+    if (!checkoutBadge) return;
+    if (!EMAIL_RE.test(buyerEmail.trim())) {
+      addToast('Please enter a valid official email address.');
+      return;
+    }
+    if (!otpSent || !otpCode.trim()) {
+      addToast('Please send and enter the 6-digit mobile OTP to verify your purchase.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const ok = await buyBadge({
+        badgeKey: checkoutBadge.key,
+        label: checkoutBadge.label,
+        priceInr: checkoutBadge.price,
+        buyerName: buyerName.trim(),
+        buyerEmail: buyerEmail.trim().toLowerCase(),
+        buyerPhone: buyerPhone.trim(),
+        organizationName: organizationName.trim(),
+        paymentMethod,
+        paymentReference: paymentReference.trim(),
+        otpCode: otpCode.trim()
+      });
+      if (ok) setCheckoutBadge(null);
+    } catch (err) {
+      addToast(err.message || 'Checkout verification failed. Please check your details and OTP.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -58,7 +144,7 @@ export default function BadgesShopPage() {
       <div className="card" style={{ padding: 20, background: 'linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface-muted) 100%)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <h2 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Sparkles size={18} color="#F59E0B" /> Why Buy a Verified Cause Badge?
+            <Sparkles size={18} color="#F59E0B" /> Why Organizers Buy Verified Cause Badges
           </h2>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <span className="badge-pill" style={{ background: '#111827', color: '#FFFFFF' }}>
@@ -85,22 +171,6 @@ export default function BadgesShopPage() {
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>{b.detail}</div>
             </div>
           ))}
-        </div>
-
-        <div
-          style={{
-            marginTop: 14,
-            padding: '10px 14px',
-            borderRadius: 12,
-            background: 'var(--accent-gold-soft)',
-            color: '#111827',
-            fontSize: '0.82rem'
-          }}
-        >
-          <strong>{user ? 'Account Synced (Supabase):' : 'Demo Checkout:'}</strong>{' '}
-          {user
-            ? `Your badges are saved to your SERVEO account (${user.name}) and boost your hosted drives & volunteer standing automatically.`
-            : 'Badges are saved in your browser for Guest. Sign in anytime to sync badges to your SERVEO account and boost your hosted events.'}
         </div>
       </div>
 
@@ -142,7 +212,7 @@ export default function BadgesShopPage() {
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '1.02rem' }}>{cat.label}</div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      ₹{price} · Lifetime Cause Badge
+                      ₹{price} · Lifetime Organizer Badge
                     </div>
                   </div>
                 </div>
@@ -184,18 +254,103 @@ export default function BadgesShopPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => buyBadge(cat.key, cat.label, price)}
+                  onClick={() => openCheckout(cat, price)}
                   className="pill-btn pill-btn-dark"
                   style={{ width: '100%', marginTop: 'auto' }}
                 >
                   <ShoppingBag size={14} />
-                  <span>Unlock {cat.label} Badge (₹{price})</span>
+                  <span>Purchase & Verify Badge (₹{price})</span>
                 </button>
               )}
             </div>
           );
         })}
       </div>
+
+      {/* Verified Badge Checkout Modal */}
+      {checkoutBadge && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
+          }}
+        >
+          <div className="card" style={{ width: '100%', maxWidth: 500, padding: 24, maxHeight: '92vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: '1.5rem' }}>{checkoutBadge.emoji}</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Verify & Purchase {checkoutBadge.label} Badge</h3>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Fee: ₹{checkoutBadge.price} · Stored in your SERVEO account</div>
+                </div>
+              </div>
+              <button type="button" onClick={() => setCheckoutBadge(null)} className="pill-btn" style={{ padding: 8 }} aria-label="Close checkout">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCheckoutSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label className="form-label">Authorized Signatory Name</label>
+                <input required className="input-field" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} placeholder="Full Name" />
+              </div>
+              <div>
+                <label className="form-label">Organization / Community Name</label>
+                <input required className="input-field" value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} placeholder="e.g., Red Cross Society" />
+              </div>
+              <div>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Official Email Address</span>
+                  {emailInvalid && <span style={{ color: '#EF4444', fontSize: '0.74rem' }}>Invalid email format</span>}
+                </label>
+                <input required type="email" className="input-field" value={buyerEmail} onChange={(e) => setBuyerEmail(e.target.value)} placeholder="contact@organization.org" />
+              </div>
+              <div className="grid-responsive-2">
+                <div>
+                  <label className="form-label">Payment Method</label>
+                  <select className="select-field" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                    <option value="netbanking">NetBanking</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">UPI ID / Transaction Ref</label>
+                  <input required className="input-field" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} placeholder="org@okaxis / TXN998" />
+                </div>
+              </div>
+              <div>
+                <label className="form-label">Indian Mobile Number (+91)</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input required type="tel" className="input-field" value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} placeholder="+919876543210" />
+                  <button type="button" onClick={handleSendOtp} disabled={sendingOtp} className="pill-btn" style={{ flexShrink: 0 }}>
+                    <Phone size={14} /> {otpSent ? 'Resend' : 'Send OTP'}
+                  </button>
+                </div>
+              </div>
+              {previewOtp && (
+                <div style={{ padding: '10px 12px', borderRadius: 12, background: 'var(--accent-gold-soft)', color: '#111827', fontSize: '0.82rem' }}>
+                  <strong>SMS Verification Code:</strong> <code>{previewOtp}</code> (valid 10m)
+                </div>
+              )}
+              <div>
+                <label className="form-label">6-Digit Mobile OTP</label>
+                <input required maxLength={6} className="input-field" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="Enter 6-digit OTP" />
+              </div>
+              <button type="submit" disabled={submitting || emailInvalid} className="pill-btn pill-btn-gold" style={{ width: '100%', padding: '12px', marginTop: 4 }}>
+                <ShieldCheck size={15} /> {submitting ? 'Verifying & Saving...' : `Verify OTP & Complete Purchase (₹${checkoutBadge.price})`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

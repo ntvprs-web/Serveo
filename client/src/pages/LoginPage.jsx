@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Lock, Phone, UserPlus, LogIn } from 'lucide-react';
+import { Lock, Phone, UserPlus, LogIn, ShieldCheck, Mail } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiFetch } from '../utils/api';
+
+const EMAIL_RE = /^[a-z0-9](?:[a-z0-9._%+-]*[a-z0-9])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 
 export default function LoginPage() {
   const { setUser, refreshMe, addToast } = useApp();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [loginMethod, setLoginMethod] = useState('password'); // 'password' | 'otp'
+
+  // Password login
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+
+  // OTP login
+  const [loginPhone, setLoginPhone] = useState('');
+  const [loginOtp, setLoginOtp] = useState('');
+  const [loginOtpSent, setLoginOtpSent] = useState(false);
+  const [loginPreviewOtp, setLoginPreviewOtp] = useState('');
 
   // Signup fields
   const [name, setName] = useState('');
@@ -20,9 +31,12 @@ export default function LoginPage() {
   const [bloodGroup, setBloodGroup] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const [signupPreviewOtp, setSignupPreviewOtp] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const handleLogin = async (e) => {
+  const emailInvalid = email.trim().length > 0 && !EMAIL_RE.test(email.trim());
+
+  const handlePasswordLogin = async (e) => {
     e.preventDefault();
     try {
       setBusy(true);
@@ -41,7 +55,43 @@ export default function LoginPage() {
     }
   };
 
-  const handleSendOtp = async () => {
+  const handleSendLoginOtp = async () => {
+    try {
+      setBusy(true);
+      const res = await apiFetch('/api/auth/otp/send', {
+        method: 'POST',
+        body: JSON.stringify({ phone: loginPhone })
+      });
+      setLoginOtpSent(true);
+      setLoginPreviewOtp(res.devOtp || '');
+      addToast(res.message || '6-digit OTP sent to your mobile.');
+    } catch (err) {
+      addToast(err.message || 'Could not send OTP');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleOtpLogin = async (e) => {
+    e.preventDefault();
+    try {
+      setBusy(true);
+      const data = await apiFetch('/api/auth/login-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone: loginPhone, code: loginOtp })
+      });
+      setUser(data.user);
+      addToast(`Signed in via OTP! Welcome back, ${data.user.name}.`);
+      refreshMe();
+      navigate('/');
+    } catch (err) {
+      addToast(err.message || 'OTP sign in failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSendSignupOtp = async () => {
     try {
       setBusy(true);
       const res = await apiFetch('/api/auth/otp/send', {
@@ -49,7 +99,8 @@ export default function LoginPage() {
         body: JSON.stringify({ phone })
       });
       setOtpSent(true);
-      addToast(res.message || 'OTP sent!');
+      setSignupPreviewOtp(res.devOtp || '');
+      addToast(res.message || '6-digit OTP sent to your mobile.');
     } catch (err) {
       addToast(err.message || 'Could not send OTP');
     } finally {
@@ -59,22 +110,26 @@ export default function LoginPage() {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    if (!EMAIL_RE.test(email.trim())) {
+      addToast('Please enter a valid email address (e.g., name@domain.com).');
+      return;
+    }
     try {
       setBusy(true);
       const data = await apiFetch('/api/auth/signup', {
         method: 'POST',
         body: JSON.stringify({
-          name,
-          username,
-          email,
-          phone,
-          code: otpCode,
+          name: name.trim(),
+          username: username.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+          code: otpCode.trim(),
           password,
           bloodGroup: bloodGroup || null
         })
       });
       setUser(data.user);
-      addToast(`Account created! Welcome, ${data.user.name}.`);
+      addToast(`Account verified & created! Welcome, ${data.user.name}.`);
       refreshMe();
       navigate('/');
     } catch (err) {
@@ -84,45 +139,18 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickDemo = async (role) => {
-    try {
-      setBusy(true);
-      const data = await apiFetch('/api/auth/quick-login', {
-        method: 'POST',
-        body: JSON.stringify({ role })
-      });
-      setUser(data.user);
-      addToast(`Signed in as ${data.user.name} (Demo ${role})`);
-      refreshMe();
-      navigate(role === 'organizer' ? '/organizer' : '/');
-    } catch (err) {
-      addToast(err.message || 'Quick demo login is only enabled in development mode.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleFastRegister = async () => {
-    try {
-      setBusy(true);
-      const data = await apiFetch('/api/auth/quick-register', {
-        method: 'POST',
-        body: JSON.stringify({})
-      });
-      setUser(data.user);
-      addToast(`Fast-registered & signed in as ${data.user.name}!`);
-      refreshMe();
-      navigate('/');
-    } catch (err) {
-      addToast(err.message || 'Fast register is only enabled in development mode.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <div style={{ maxWidth: 500, margin: '12px auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div style={{ maxWidth: 520, margin: '12px auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div className="card" style={{ padding: 24 }}>
+        <div style={{ marginBottom: 16 }}>
+          <h1 style={{ margin: '0 0 4px', fontSize: '1.4rem', fontWeight: 800 }}>
+            SERVEO <span className="serif-italic" style={{ fontSize: '1.55rem' }}>Account</span>
+          </h1>
+          <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+            Sign in with your credentials or +91 mobile OTP, or register a verified account.
+          </p>
+        </div>
+
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
           <button
             type="button"
@@ -151,42 +179,114 @@ export default function LoginPage() {
         </div>
 
         {mode === 'login' ? (
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <label className="form-label">Email, Username, or +91 Phone</label>
-              <input
-                required
-                className="input-field"
-                placeholder="aarav@example.com or +919876543210"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-              />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', gap: 6, padding: 4, borderRadius: 12, background: 'var(--bg-surface-muted)' }}>
+              <button
+                type="button"
+                onClick={() => setLoginMethod('password')}
+                className="pill-btn"
+                style={{
+                  flex: 1,
+                  padding: '7px 10px',
+                  fontSize: '0.8rem',
+                  border: 'none',
+                  background: loginMethod === 'password' ? 'var(--bg-surface)' : 'transparent'
+                }}
+              >
+                <Lock size={13} /> Password
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginMethod('otp')}
+                className="pill-btn"
+                style={{
+                  flex: 1,
+                  padding: '7px 10px',
+                  fontSize: '0.8rem',
+                  border: 'none',
+                  background: loginMethod === 'otp' ? 'var(--bg-surface)' : 'transparent'
+                }}
+              >
+                <Phone size={13} /> Mobile OTP
+              </button>
             </div>
-            <div>
-              <label className="form-label">Password</label>
-              <input
-                required
-                type="password"
-                className="input-field"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <button type="submit" disabled={busy} className="pill-btn pill-btn-dark" style={{ width: '100%', padding: '12px' }}>
-              <Lock size={15} /> {busy ? 'Signing in...' : 'Sign In to SERVEO'}
-            </button>
-          </form>
+
+            {loginMethod === 'password' ? (
+              <form onSubmit={handlePasswordLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label className="form-label">Email, Username, or +91 Phone</label>
+                  <input
+                    required
+                    className="input-field"
+                    placeholder="name@example.com or +919876543210"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Password</label>
+                  <input
+                    required
+                    type="password"
+                    className="input-field"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                <button type="submit" disabled={busy} className="pill-btn pill-btn-dark" style={{ width: '100%', padding: '12px' }}>
+                  <Lock size={15} /> {busy ? 'Signing in...' : 'Sign In to SERVEO'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleOtpLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label className="form-label">Registered Indian Mobile Number (+91)</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      required
+                      className="input-field"
+                      placeholder="+919876543210"
+                      value={loginPhone}
+                      onChange={(e) => setLoginPhone(e.target.value)}
+                    />
+                    <button type="button" onClick={handleSendLoginOtp} disabled={busy} className="pill-btn" style={{ flexShrink: 0 }}>
+                      <Phone size={14} /> {loginOtpSent ? 'Resend' : 'Send OTP'}
+                    </button>
+                  </div>
+                </div>
+                {loginPreviewOtp && (
+                  <div style={{ padding: '10px 12px', borderRadius: 12, background: 'var(--accent-gold-soft)', color: '#111827', fontSize: '0.82rem' }}>
+                    <strong>SMS Verification Code:</strong> <code>{loginPreviewOtp}</code> (valid for 10 minutes)
+                  </div>
+                )}
+                <div>
+                  <label className="form-label">6-Digit OTP</label>
+                  <input
+                    required
+                    maxLength={6}
+                    className="input-field"
+                    placeholder="Enter 6-digit OTP"
+                    value={loginOtp}
+                    onChange={(e) => setLoginOtp(e.target.value)}
+                  />
+                </div>
+                <button type="submit" disabled={busy || !loginOtpSent} className="pill-btn pill-btn-gold" style={{ width: '100%', padding: '12px' }}>
+                  <ShieldCheck size={15} /> {busy ? 'Verifying OTP...' : 'Verify OTP & Sign In'}
+                </button>
+              </form>
+            )}
+          </div>
         ) : (
           <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label className="form-label">Full Name</label>
-              <input required className="input-field" value={name} onChange={(e) => setName(e.target.value)} />
+              <label className="form-label">Full Name / Organization Name</label>
+              <input required className="input-field" placeholder="e.g., Nivesh Tyagi" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="grid-responsive-2">
               <div>
                 <label className="form-label">Username</label>
-                <input required className="input-field" value={username} onChange={(e) => setUsername(e.target.value)} />
+                <input required className="input-field" placeholder="nivesh_serveo" value={username} onChange={(e) => setUsername(e.target.value)} />
               </div>
               <div>
                 <label className="form-label">Blood Group (Optional)</label>
@@ -199,8 +299,22 @@ export default function LoginPage() {
               </div>
             </div>
             <div>
-              <label className="form-label">Email</label>
-              <input required type="email" className="input-field" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Email Address</span>
+                {emailInvalid && <span style={{ color: '#EF4444', fontSize: '0.74rem' }}>Invalid email format</span>}
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={15} color="var(--text-muted)" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  required
+                  type="email"
+                  className="input-field"
+                  style={{ paddingLeft: 38 }}
+                  placeholder="you@domain.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
             </div>
             <div>
               <label className="form-label">Indian Mobile Number (+91)</label>
@@ -212,17 +326,23 @@ export default function LoginPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                 />
-                <button type="button" onClick={handleSendOtp} disabled={busy} className="pill-btn" style={{ flexShrink: 0 }}>
+                <button type="button" onClick={handleSendSignupOtp} disabled={busy} className="pill-btn" style={{ flexShrink: 0 }}>
                   <Phone size={14} /> {otpSent ? 'Resend' : 'Send OTP'}
                 </button>
               </div>
             </div>
+            {signupPreviewOtp && (
+              <div style={{ padding: '10px 12px', borderRadius: 12, background: 'var(--accent-gold-soft)', color: '#111827', fontSize: '0.82rem' }}>
+                <strong>SMS Verification Code:</strong> <code>{signupPreviewOtp}</code> (valid for 10 minutes)
+              </div>
+            )}
             <div>
-              <label className="form-label">SMS Verification Code (Dev test: 123456)</label>
+              <label className="form-label">6-Digit Mobile OTP</label>
               <input
                 required
+                maxLength={6}
                 className="input-field"
-                placeholder="6-digit OTP"
+                placeholder="Enter 6-digit OTP"
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value)}
               />
@@ -238,29 +358,11 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <button type="submit" disabled={busy} className="pill-btn pill-btn-gold" style={{ width: '100%', padding: '12px' }}>
-              {busy ? 'Creating Account...' : 'Verify & Create Account'}
+            <button type="submit" disabled={busy || emailInvalid} className="pill-btn pill-btn-gold" style={{ width: '100%', padding: '12px' }}>
+              <ShieldCheck size={15} /> {busy ? 'Verifying & Creating...' : 'Verify OTP & Create Account'}
             </button>
           </form>
         )}
-      </div>
-
-      {/* 1-Click Fast Demo Access (from SERVEO Project Guide) */}
-      <div className="card" style={{ padding: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontWeight: 700, fontSize: '0.9rem' }}>
-          <Zap size={16} color="#F59E0B" /> 1-Click Fast Demo Access (Dev Mode)
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button type="button" onClick={() => handleQuickDemo('organizer')} disabled={busy} className="pill-btn">
-            Quick Demo Organizer (Indian Red Cross Society)
-          </button>
-          <button type="button" onClick={() => handleQuickDemo('volunteer')} disabled={busy} className="pill-btn">
-            Quick Demo Volunteer (Aarav Sharma)
-          </button>
-          <button type="button" onClick={handleFastRegister} disabled={busy} className="pill-btn pill-btn-coral">
-            1-Click Fast Register (New Indian Citizen Account)
-          </button>
-        </div>
       </div>
     </div>
   );

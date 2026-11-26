@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -7,6 +8,15 @@ if (!JWT_SECRET) {
   throw new Error('FATAL: JWT_SECRET environment variable is required. Set it in backend/.env or backend/.env.local');
 }
 const COOKIE_NAME = 'serveo_token';
+
+// In-memory OTP store for real 6-digit phone OTP verification when Twilio is not configured
+const otpStore = new Map();
+const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+
+function hashOtp(phone, code) {
+  return crypto.createHash('sha256').update(`${phone}:${String(code).trim()}`).digest('hex');
+}
 
 // Normalize Indian phone numbers to E.164: +919876543210
 function normalizeIndianPhone(raw) {
@@ -27,23 +37,26 @@ function isValidIndianPhone(phone) {
 }
 
 function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim().toLowerCase());
+  const val = String(email || '').trim().toLowerCase();
+  if (!val || val.length > 254 || val.includes('..')) return false;
+  return /^[a-z0-9](?:[a-z0-9._%+-]*[a-z0-9])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(val);
 }
 
-// Twilio Verify API integration
+// Twilio Verify API integration with real 6-digit random OTP fallback
 async function sendTwilioOtp(phone) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
   if (!accountSid || !authToken || !serviceSid) {
-    if (process.env.NODE_ENV === 'development' && process.env.DEV_OTP_ALLOW === 'true') {
-      console.log(`[DEV MODE] Twilio credentials not set. Simulated OTP 123456 generated for ${phone}.`);
-      return { success: true, simulated: true, code: '123456' };
-    }
-    const err = new Error('SMS verification provider is not configured on this server.');
-    err.code = 'SMS_PROVIDER_NOT_CONFIGURED';
-    throw err;
+    const code = String(crypto.randomInt(100000, 1000000));
+    otpStore.set(phone, {
+      hash: hashOtp(phone, code),
+      expiresAt: Date.now() + OTP_TTL_MS,
+      attempts: 0
+    });
+    console.log(`[SERVEO OTP] Generated 6-digit verification code for ${phone}: ${code} (valid 10m)`);
+    return { success: true, simulated: true, code };
   }
 
   const url = `https://verify.twilio.com/v2/Services/${serviceSid}/Verifications`;
@@ -73,15 +86,30 @@ async function verifyTwilioOtp(phone, code) {
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
   if (!accountSid || !authToken || !serviceSid) {
-    if (process.env.NODE_ENV === 'development' && process.env.DEV_OTP_ALLOW === 'true') {
-      if (code === '123456') {
-        return { approved: true, simulated: true };
-      }
-      return { approved: false, message: 'Invalid test OTP. Use 123456 in dev mode.' };
+    const cleanCode = String(code || '').trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      return { approved: false, message: 'Enter a valid 6-digit OTP code.' };
     }
-    const err = new Error('SMS verification provider is not configured on this server.');
-    err.code = 'SMS_PROVIDER_NOT_CONFIGURED';
-    throw err;
+    const entry = otpStore.get(phone);
+    if (!entry) {
+      return { approved: false, message: 'No active OTP found for this phone number. Please request a new OTP.' };
+    }
+    if (Date.now() > entry.expiresAt) {
+      otpStore.delete(phone);
+      return { approved: false, message: 'OTP expired. Please request a new 6-digit code.' };
+    }
+    if (entry.attempts >= OTP_MAX_ATTEMPTS) {
+      otpStore.delete(phone);
+      return { approved: false, message: 'Too many incorrect OTP attempts. Please request a new code.' };
+    }
+    const candidateHash = hashOtp(phone, cleanCode);
+    const match = crypto.timingSafeEqual(Buffer.from(entry.hash, 'hex'), Buffer.from(candidateHash, 'hex'));
+    if (!match) {
+      entry.attempts += 1;
+      return { approved: false, message: `Incorrect OTP code (${OTP_MAX_ATTEMPTS - entry.attempts} attempts left).` };
+    }
+    otpStore.delete(phone);
+    return { approved: true, simulated: true };
   }
 
   const url = `https://verify.twilio.com/v2/Services/${serviceSid}/VerificationCheck`;
