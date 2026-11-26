@@ -9,13 +9,52 @@ if (!JWT_SECRET) {
 }
 const COOKIE_NAME = 'serveo_token';
 
-// In-memory OTP store for real 6-digit phone OTP verification when Twilio is not configured
+// In-memory OTP stores for real 6-digit phone & email OTP verification
 const otpStore = new Map();
+const emailOtpStore = new Map();
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 
-function hashOtp(phone, code) {
-  return crypto.createHash('sha256').update(`${phone}:${String(code).trim()}`).digest('hex');
+function hashOtp(key, code) {
+  return crypto.createHash('sha256').update(`${String(key).toLowerCase()}:${String(code).trim()}`).digest('hex');
+}
+
+function issueOtp(store, key, label) {
+  const code = String(crypto.randomInt(100000, 1000000));
+  store.set(key, {
+    hash: hashOtp(key, code),
+    expiresAt: Date.now() + OTP_TTL_MS,
+    attempts: 0
+  });
+  console.log(`[SERVEO ${label} OTP] Generated 6-digit code for ${key}: ${code} (valid 10m)`);
+  return code;
+}
+
+function checkOtp(store, key, code, label) {
+  const cleanCode = String(code || '').trim();
+  if (!/^\d{6}$/.test(cleanCode)) {
+    return { approved: false, message: `Enter a valid 6-digit ${label} OTP code.` };
+  }
+  const entry = store.get(key);
+  if (!entry) {
+    return { approved: false, message: `No active ${label} OTP found. Please request a new code.` };
+  }
+  if (Date.now() > entry.expiresAt) {
+    store.delete(key);
+    return { approved: false, message: `${label} OTP expired. Please request a new 6-digit code.` };
+  }
+  if (entry.attempts >= OTP_MAX_ATTEMPTS) {
+    store.delete(key);
+    return { approved: false, message: `Too many incorrect ${label} OTP attempts. Please request a new code.` };
+  }
+  const candidateHash = hashOtp(key, cleanCode);
+  const match = crypto.timingSafeEqual(Buffer.from(entry.hash, 'hex'), Buffer.from(candidateHash, 'hex'));
+  if (!match) {
+    entry.attempts += 1;
+    return { approved: false, message: `Incorrect ${label} OTP (${OTP_MAX_ATTEMPTS - entry.attempts} attempts left).` };
+  }
+  store.delete(key);
+  return { approved: true, simulated: true };
 }
 
 // Normalize Indian phone numbers to E.164: +919876543210
@@ -49,13 +88,7 @@ async function sendTwilioOtp(phone) {
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
   if (!accountSid || !authToken || !serviceSid) {
-    const code = String(crypto.randomInt(100000, 1000000));
-    otpStore.set(phone, {
-      hash: hashOtp(phone, code),
-      expiresAt: Date.now() + OTP_TTL_MS,
-      attempts: 0
-    });
-    console.log(`[SERVEO OTP] Generated 6-digit verification code for ${phone}: ${code} (valid 10m)`);
+    const code = issueOtp(otpStore, phone, 'SMS');
     return { success: true, simulated: true, code };
   }
 
@@ -86,30 +119,7 @@ async function verifyTwilioOtp(phone, code) {
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
   if (!accountSid || !authToken || !serviceSid) {
-    const cleanCode = String(code || '').trim();
-    if (!/^\d{6}$/.test(cleanCode)) {
-      return { approved: false, message: 'Enter a valid 6-digit OTP code.' };
-    }
-    const entry = otpStore.get(phone);
-    if (!entry) {
-      return { approved: false, message: 'No active OTP found for this phone number. Please request a new OTP.' };
-    }
-    if (Date.now() > entry.expiresAt) {
-      otpStore.delete(phone);
-      return { approved: false, message: 'OTP expired. Please request a new 6-digit code.' };
-    }
-    if (entry.attempts >= OTP_MAX_ATTEMPTS) {
-      otpStore.delete(phone);
-      return { approved: false, message: 'Too many incorrect OTP attempts. Please request a new code.' };
-    }
-    const candidateHash = hashOtp(phone, cleanCode);
-    const match = crypto.timingSafeEqual(Buffer.from(entry.hash, 'hex'), Buffer.from(candidateHash, 'hex'));
-    if (!match) {
-      entry.attempts += 1;
-      return { approved: false, message: `Incorrect OTP code (${OTP_MAX_ATTEMPTS - entry.attempts} attempts left).` };
-    }
-    otpStore.delete(phone);
-    return { approved: true, simulated: true };
+    return checkOtp(otpStore, phone, code, 'SMS');
   }
 
   const url = `https://verify.twilio.com/v2/Services/${serviceSid}/VerificationCheck`;
@@ -206,12 +216,46 @@ function authenticateRequired(req, res, next) {
   return next();
 }
 
+async function sendEmailOtp(email) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const code = issueOtp(emailOtpStore, cleanEmail, 'EMAIL');
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM || 'SERVEO <onboarding@resend.dev>',
+        to: [cleanEmail],
+        subject: 'Your SERVEO Email Verification OTP',
+        text: `Your SERVEO 6-digit email verification code is ${code}. It is valid for 10 minutes.`
+      })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.message || 'Could not send verification email.');
+    }
+    return { success: true, simulated: false };
+  }
+  return { success: true, simulated: true, code };
+}
+
+async function verifyEmailOtp(email, code) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  return checkOtp(emailOtpStore, cleanEmail, code, 'Email');
+}
+
 module.exports = {
   normalizeIndianPhone,
   isValidIndianPhone,
   isValidEmail,
   sendTwilioOtp,
   verifyTwilioOtp,
+  sendEmailOtp,
+  verifyEmailOtp,
   generateToken,
   setAuthCookie,
   clearAuthCookie,

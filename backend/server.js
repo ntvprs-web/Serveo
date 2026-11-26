@@ -19,6 +19,8 @@ const {
   isValidEmail,
   sendTwilioOtp,
   verifyTwilioOtp,
+  sendEmailOtp,
+  verifyEmailOtp,
   generateToken,
   setAuthCookie,
   clearAuthCookie,
@@ -66,6 +68,7 @@ const foodActionLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 20, stand
 const disasterModeLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false });
 app.use('/api/auth/', authLimiter);
 app.use('/api/auth/otp/send', otpSendLimiter);
+app.use('/api/auth/email-otp/send', otpSendLimiter);
 app.use('/api/events/:id/volunteer/otp/send', otpSendLimiter);
 
 // Restrict CORS to known origins and local development hosts
@@ -167,10 +170,10 @@ app.post('/api/auth/otp/send', async (req, res) => {
   }
 });
 
-// Step 2: Verify OTP and create user account
+// Step 2: Verify Phone OTP + Email OTP and create user account
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    const { name, username, email, phone: rawPhone, code, password, notificationLat, notificationLng, bloodGroup } = req.body;
+    const { name, username, email, phone: rawPhone, code, emailCode, password, notificationLat, notificationLng, bloodGroup } = req.body;
 
     if (!name || !username || !email || !rawPhone || !password) {
       return res.status(400).json({ error: 'MISSING_FIELDS', message: 'All fields are required.' });
@@ -178,7 +181,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     const phone = normalizeIndianPhone(rawPhone);
     if (!phone || !isValidIndianPhone(phone)) {
-      return res.status(400).json({ error: 'INVALID_PHONE', message: 'Invalid Indian mobile number.' });
+      return res.status(400).json({ error: 'INVALID_PHONE', message: 'A valid 10-digit Indian mobile number starting with 6-9 is required.' });
     }
 
     if (!isValidEmail(email)) {
@@ -189,14 +192,22 @@ app.post('/api/auth/signup', async (req, res) => {
       return res.status(400).json({ error: 'WEAK_PASSWORD', message: 'Password must be at least 6 characters.' });
     }
 
-    // Verify Twilio OTP
+    // Verify Mobile OTP
     if (!code) {
-      return res.status(400).json({ error: 'MISSING_OTP', message: 'SMS verification code is required.' });
+      return res.status(400).json({ error: 'MISSING_OTP', message: '6-digit mobile verification OTP is required.' });
     }
-
     const otpCheck = await verifyTwilioOtp(phone, String(code).trim());
     if (!otpCheck.approved) {
-      return res.status(400).json({ error: 'INVALID_OTP', message: otpCheck.message || 'Invalid or expired OTP code.' });
+      return res.status(400).json({ error: 'INVALID_OTP', message: otpCheck.message || 'Invalid or expired mobile OTP code.' });
+    }
+
+    // Verify Email OTP
+    if (!emailCode) {
+      return res.status(400).json({ error: 'MISSING_EMAIL_OTP', message: '6-digit email verification OTP is required.' });
+    }
+    const emailOtpCheck = await verifyEmailOtp(email, String(emailCode).trim());
+    if (!emailOtpCheck.approved) {
+      return res.status(400).json({ error: 'INVALID_EMAIL_OTP', message: emailOtpCheck.message || 'Invalid or expired email OTP code.' });
     }
 
     // Check unique constraints
@@ -294,6 +305,32 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'LOGIN_FAILED', message: err.message });
+  }
+});
+
+// Step 1b: Send Email verification OTP
+app.post('/api/auth/email-otp/send', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        error: 'INVALID_EMAIL',
+        message: 'Please provide a valid email address (e.g., name@domain.com).'
+      });
+    }
+    const result = await sendEmailOtp(email);
+    res.json({
+      success: true,
+      email,
+      simulated: Boolean(result.simulated),
+      ...(result.simulated && result.code ? { devOtp: result.code } : {}),
+      expiresInSeconds: 600,
+      message: result.simulated
+        ? `Email verification OTP generated for ${email}. Enter the 6-digit code.`
+        : 'A 6-digit verification code has been sent to your email.'
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'EMAIL_OTP_FAILED', message: err.message });
   }
 });
 
