@@ -8,6 +8,8 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node --watch backend/server.js",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
     "test": "node backend/test.js"
   },
   "dependencies": {

@@ -1,1 +1,1 @@
-module.exports = '2026-10-30-v1';
+module.exports = '2026-11-25-v2';
