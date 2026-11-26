@@ -3,7 +3,7 @@
    Enables offline capabilities & cached assets for emergency zones
    ============================================ */
 
-const CACHE_NAME = 'serveo-cache-v59';
+const CACHE_NAME = 'serveo-cache-v60';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
