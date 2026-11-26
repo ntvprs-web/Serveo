@@ -221,6 +221,19 @@ async function sendEmailOtp(email) {
   const code = issueOtp(emailOtpStore, cleanEmail, 'EMAIL');
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 28px; background: #f8fafc; border-radius: 16px;">
+        <div style="background: #ffffff; padding: 28px; border-radius: 14px; border: 1px solid #e2e8f0;">
+          <div style="font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 6px;">SERVEO Community</div>
+          <p style="font-size: 14px; color: #475569; margin: 0 0 20px;">Use the 6-digit verification code below to verify your email address on SERVEO:</p>
+          <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; text-align: center; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #111827; margin-bottom: 20px;">
+            ${code}
+          </div>
+          <p style="font-size: 13px; color: #64748b; margin: 0 0 8px;">This code expires in <strong>10 minutes</strong>. Never share it with anyone.</p>
+          <p style="font-size: 12px; color: #94a3b8; margin: 0;">If you did not request this code, you can safely ignore this email.</p>
+        </div>
+      </div>
+    `;
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -228,10 +241,11 @@ async function sendEmailOtp(email) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'SERVEO <onboarding@resend.dev>',
+        from: process.env.EMAIL_FROM || 'SERVEO Community <onboarding@resend.dev>',
         to: [cleanEmail],
-        subject: 'Your SERVEO Email Verification OTP',
-        text: `Your SERVEO 6-digit email verification code is ${code}. It is valid for 10 minutes.`
+        subject: `${code} is your SERVEO verification code`,
+        html,
+        text: `Your SERVEO 6-digit email verification code is ${code}. Valid for 10 minutes.`
       })
     });
     if (!res.ok) {

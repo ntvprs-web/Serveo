@@ -57,6 +57,7 @@ export default function LoginPage() {
   const [phoneVerified, setPhoneVerified] = useState(false);
   const fbUserRef = useRef(null);
   const signupConfirmRef = useRef(null);
+  const [authError, setAuthError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const emailInvalid = email.trim().length > 0 && !EMAIL_RE.test(email.trim());
@@ -209,12 +210,17 @@ export default function LoginPage() {
 
   // Step 2 on Signup: Link & Verify +91 Mobile via Firebase SMS OTP
   const handleSendSignupSms = async () => {
+    setAuthError('');
     if (!isValid10DigitIndian(phoneDigits)) {
-      addToast('Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.');
+      const msg = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+      setAuthError(msg);
+      addToast(msg);
       return;
     }
     if (!fbUserRef.current) {
-      addToast('Please verify your email first so your phone links to your account.');
+      const msg = 'Complete Step 1 (Verify Email & click "Check Email Verification") first so your phone links to your account.';
+      setAuthError(msg);
+      addToast(msg);
       return;
     }
     try {
@@ -225,7 +231,11 @@ export default function LoginPage() {
       setSmsSent(true);
       addToast(`Real SMS OTP sent via Firebase to +91${phoneDigits}!`);
     } catch (err) {
-      addToast(err.message || 'Could not send Firebase SMS OTP.');
+      const msg = err.code === 'auth/billing-not-enabled'
+        ? 'Firebase Phone SMS requires Blaze plan or a Test Phone Number in Firebase Console (Authentication → Sign-in method → Phone → Phone numbers for testing).'
+        : (err.message || 'Could not send Firebase SMS OTP. If using Brave, disable Shields on localhost for reCAPTCHA.');
+      setAuthError(msg);
+      addToast(msg);
     } finally {
       setBusy(false);
     }
@@ -538,7 +548,7 @@ export default function LoginPage() {
               <div style={{ display: 'flex', gap: 8 }}>
                 {renderPhoneInput(phoneDigits, setPhoneDigits, signupPhoneInvalid, phoneVerified)}
                 {!phoneVerified && (
-                  <button type="button" onClick={handleSendSignupSms} disabled={busy || !emailVerified} className="pill-btn" style={{ flexShrink: 0 }}>
+                  <button type="button" onClick={handleSendSignupSms} disabled={busy} className="pill-btn" style={{ flexShrink: 0 }}>
                     <Phone size={14} /> {smsSent ? 'Resend' : 'Send SMS'}
                   </button>
                 )}
@@ -558,6 +568,12 @@ export default function LoginPage() {
                 <button type="button" onClick={handleVerifySignupSms} disabled={busy} className="pill-btn pill-btn-dark" style={{ flexShrink: 0 }}>
                   <CheckCircle2 size={14} /> Confirm OTP
                 </button>
+              </div>
+            )}
+
+            {authError && (
+              <div style={{ padding: '10px 12px', borderRadius: 12, background: '#FEE2E2', color: '#991B1B', fontSize: '0.82rem', lineHeight: 1.45 }}>
+                {authError}
               </div>
             )}
 
