@@ -317,6 +317,8 @@ app.post('/api/auth/login', async (req, res) => {
       email: user.email,
       phone: user.phone,
       bloodGroup: user.bloodGroup || null,
+      organizationType: user.organizationType || null,
+      role: user.organizationType ? 'organizer' : 'volunteer',
       isAdmin: user.isAdmin,
       organizationBanned: user.organizationBanned
     };
@@ -419,10 +421,10 @@ app.post('/api/auth/login-otp', async (req, res) => {
   }
 });
 
-// Supabase Email/Phone OTP verified authentication bridge
+// Supabase Dual-Verified (Email + Phone OTP) Registration & Session Bridge
 app.post('/api/auth/supabase', async (req, res) => {
   try {
-    const { accessToken, name, username, bloodGroup } = req.body || {};
+    const { accessToken, mode = 'signup', name, username, password, bloodGroup, role = 'volunteer', organizationType } = req.body || {};
     if (!accessToken) {
       return res.status(400).json({ error: 'MISSING_ACCESS_TOKEN', message: 'Supabase access token is required.' });
     }
@@ -432,7 +434,6 @@ app.post('/api/auth/supabase', async (req, res) => {
       return res.status(503).json({ error: 'SUPABASE_AUTH_NOT_CONFIGURED', message: 'Supabase URL/Anon key not configured on server.' });
     }
 
-    // Verify the Supabase JWT directly against Supabase Auth /auth/v1/user
     const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: {
         Authorization: `Bearer ${String(accessToken).trim()}`,
@@ -446,36 +447,68 @@ app.post('/api/auth/supabase', async (req, res) => {
     const verifiedEmail = sbUser.email ? String(sbUser.email).trim().toLowerCase() : null;
     const verifiedPhone = sbUser.phone ? normalizeIndianPhone(sbUser.phone) : null;
 
-    if (!verifiedEmail && !verifiedPhone) {
-      return res.status(400).json({ error: 'NO_VERIFIED_IDENTITY', message: 'Supabase user has neither verified email nor phone.' });
-    }
+    if (mode === 'signup') {
+      if (!verifiedEmail) {
+        return res.status(400).json({ error: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email with the 6-digit Email OTP first.' });
+      }
+      if (!verifiedPhone || !isValidIndianPhone(verifiedPhone)) {
+        return res.status(400).json({ error: 'PHONE_NOT_VERIFIED', message: 'Please verify your 10-digit +91 mobile number with the 6-digit SMS OTP.' });
+      }
+      if (!name || !String(name).trim() || !username || !String(username).trim() || !password || String(password).length < 6) {
+        return res.status(400).json({ error: 'MISSING_FIELDS', message: 'Full name, username, and password (min 6 characters) are required.' });
+      }
 
-    let user = (verifiedPhone && await db.findUserByIdentifier(verifiedPhone)) ||
-               (verifiedEmail && await db.findUserByIdentifier(verifiedEmail));
+      const cleanUsername = String(username).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const existing = await db.findUserByIdentifier(verifiedEmail) ||
+                       await db.findUserByIdentifier(cleanUsername) ||
+                       await db.findUserByIdentifier(verifiedPhone);
+      if (existing) {
+        return res.status(409).json({ error: 'USER_EXISTS', message: 'An account with this email, username, or mobile number already exists. Please Sign In instead.' });
+      }
 
-    if (!user) {
-      const randomPass = crypto.randomBytes(24).toString('hex');
-      const passwordHash = await bcrypt.hash(randomPass, 10);
-      const baseUsername = (username || (verifiedEmail ? verifiedEmail.split('@')[0] : `user_${String(sbUser.id).slice(0, 8)}`))
-        .toLowerCase()
-        .replace(/[^a-z0-9_]/g, '_')
-        .slice(0, 28);
-      const uniqueSuffix = Math.floor(100 + Math.random() * 900);
-      const existingUsername = await db.findUserByIdentifier(baseUsername);
-      const finalUsername = existingUsername ? `${baseUsername}_${uniqueSuffix}` : baseUsername;
-      const displayName = (name && String(name).trim()) ||
-        (verifiedEmail ? verifiedEmail.split('@')[0] : 'SERVEO Member');
+      const passwordHash = await bcrypt.hash(String(password), 10);
+      const resolvedOrgType = role === 'organizer'
+        ? (['organizer', 'ngo', 'hospital', 'blood_bank', 'restaurant', 'orphanage'].includes(organizationType) ? organizationType : 'organizer')
+        : null;
 
-      user = await db.createUser({
-        name: displayName,
-        username: finalUsername,
-        email: verifiedEmail || `${finalUsername}@phone.serveo.in`,
-        phone: verifiedPhone || `+919000000${uniqueSuffix}`,
+      const user = await db.createUser({
+        name: String(name).trim(),
+        username: cleanUsername,
+        email: verifiedEmail,
+        phone: verifiedPhone,
         passwordHash,
-        bloodGroup: bloodGroup || null
+        bloodGroup: bloodGroup || null,
+        organizationType: resolvedOrgType
+      });
+
+      const token = generateToken(user);
+      setAuthCookie(res, token);
+      return res.status(201).json({
+        success: true,
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          phone: user.phone,
+          bloodGroup: user.bloodGroup || null,
+          organizationType: user.organizationType || null,
+          role: user.organizationType ? 'organizer' : 'volunteer',
+          isAdmin: user.isAdmin,
+          organizationBanned: user.organizationBanned
+        },
+        token
       });
     }
 
+    if (!verifiedEmail && !verifiedPhone) {
+      return res.status(400).json({ error: 'NO_VERIFIED_IDENTITY', message: 'Supabase user has neither verified email nor phone.' });
+    }
+    const user = (verifiedPhone && await db.findUserByIdentifier(verifiedPhone)) ||
+                 (verifiedEmail && await db.findUserByIdentifier(verifiedEmail));
+    if (!user) {
+      return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'No SERVEO profile found. Please Register first.' });
+    }
     if (user.organizationBanned) {
       return res.status(403).json({
         error: 'ACCOUNT_BANNED',
@@ -494,6 +527,8 @@ app.post('/api/auth/supabase', async (req, res) => {
         email: user.email,
         phone: user.phone,
         bloodGroup: user.bloodGroup || null,
+        organizationType: user.organizationType || null,
+        role: user.organizationType ? 'organizer' : 'volunteer',
         isAdmin: user.isAdmin,
         organizationBanned: user.organizationBanned
       },
@@ -626,6 +661,8 @@ app.get('/api/auth/me', async (req, res) => {
       email: user.email,
       phone: user.phone,
       bloodGroup: user.bloodGroup || null,
+      organizationType: user.organizationType || null,
+      role: user.organizationType ? 'organizer' : 'volunteer',
       isAdmin: user.isAdmin,
       organizationBanned: user.organizationBanned
     }

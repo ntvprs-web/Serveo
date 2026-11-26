@@ -781,7 +781,7 @@ class DatabaseManager {
     }
   }
 
-  async createUser({ name, username, email, phone, passwordHash, notificationLat, notificationLng, bloodGroup, homeCity }) {
+  async createUser({ name, username, email, phone, passwordHash, notificationLat, notificationLng, bloodGroup, homeCity, organizationType = null }) {
     const id = 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     const now = new Date().toISOString();
 
@@ -795,6 +795,7 @@ class DatabaseManager {
       phoneVerified: true,
       passwordHash,
       bloodGroup: bloodGroup || null,
+      organizationType: organizationType || null,
       lastDonationDate: null,
       donationCooldownDays: null,
       donationReminderSentDate: null,
@@ -814,11 +815,11 @@ class DatabaseManager {
 
     if (this.mode === 'postgres') {
       await this.pool.query(
-        `INSERT INTO users (id, name, username, email, email_verified, phone, phone_verified, password_hash, blood_group, notification_lat, notification_lng, notifications_enabled, subscription_status, organization_banned, false_alarm_count, is_admin, home_city, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+        `INSERT INTO users (id, name, username, email, email_verified, phone, phone_verified, password_hash, blood_group, organization_type, notification_lat, notification_lng, notifications_enabled, subscription_status, organization_banned, false_alarm_count, is_admin, home_city, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
         [
           user.id, user.name, user.username, user.email, user.emailVerified,
-          user.phone, user.phoneVerified, user.passwordHash, user.bloodGroup, user.notificationLat,
+          user.phone, user.phoneVerified, user.passwordHash, user.bloodGroup, user.organizationType, user.notificationLat,
           user.notificationLng, user.notificationsEnabled, user.subscriptionStatus,
           user.organizationBanned, user.falseAlarmCount, user.isAdmin, user.homeCity, now, now
         ]
@@ -1966,6 +1967,7 @@ class DatabaseManager {
       phone: r.phone,
       phoneVerified: r.phone_verified,
       bloodGroup: r.blood_group || null,
+      organizationType: r.organization_type || null,
       lastDonationDate: r.last_donation_date ? String(r.last_donation_date).slice(0,10) : null,
       donationCooldownDays: r.donation_cooldown_days || null,
       leaderboardOptOut: Boolean(r.leaderboard_opt_out),
