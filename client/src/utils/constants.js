@@ -179,3 +179,38 @@ export const HOSTING_PACKAGES = [
     ]
   }
 ];
+
+export const BADGE_OVERVIEW_BENEFITS = [
+  {
+    id: 'priority-boost',
+    title: 'Priority Discovery Ranking',
+    detail: 'Events you host in your badged cause rank higher on Discover & Home with a Verified Specialist seal.'
+  },
+  {
+    id: 'trust-seal',
+    title: 'Verified Cause Seal Everywhere',
+    detail: 'Displays live on your Event Cards, Event Detail pages, Organizer Portal, and Volunteer Rosters.'
+  },
+  {
+    id: 'impact-bonus',
+    title: '+25% Impact Standing & Priority Alerts',
+    detail: 'Boosts your Volunteer Impact Standing on My Hours and prioritizes matching-cause emergency alerts.'
+  },
+  {
+    id: 'cause-funding',
+    title: '100% Cause Verification Support',
+    detail: 'Funds SMS alerts, hospital blood-stock verification, and food-safety dispatch for that specific sector.'
+  }
+];
+
+export function getBadgeDetails(cat, index = 0) {
+  const price = 49 + index * 10;
+  return {
+    price,
+    perks: [
+      `Priority Boost on ${cat.label} listings`,
+      `Verified ${cat.label} Specialist seal on Event Cards`,
+      '+25% Civic Standing bonus & Roster priority'
+    ]
+  };
+}

@@ -56,6 +56,15 @@ export function AppProvider({ children }) {
     }
   });
 
+  const [badgeRecords, setBadgeRecords] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('serveo_category_badges_guest') || '[]');
+      return Array.isArray(raw) ? raw.map(k => (typeof k === 'string' ? { badgeKey: k, equipped: true } : k)) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [termsAccepted, setTermsAccepted] = useState(() => {
     return localStorage.getItem('serveo_terms_version') === SERVEO_TERMS_VERSION;
   });
@@ -141,8 +150,21 @@ export function AppProvider({ children }) {
           setNotifications(list);
           knownNotifIdsRef.current = new Set(list.map(i => String(i.id)));
         }).catch(() => {});
+        apiFetch('/api/badges/mine').then(b => {
+          if (b && Array.isArray(b.badges)) {
+            setBadgeRecords(b.badges);
+            const userKey = String(data.user.id || data.user.username || 'guest');
+            localStorage.setItem(`serveo_category_badges_${userKey}`, JSON.stringify(b.badges.map(x => x.badgeKey)));
+          }
+        }).catch(() => {});
       } else {
         setNotifications([]);
+        try {
+          const raw = JSON.parse(localStorage.getItem('serveo_category_badges_guest') || '[]');
+          setBadgeRecords(Array.isArray(raw) ? raw.map(k => (typeof k === 'string' ? { badgeKey: k, equipped: true } : k)) : []);
+        } catch {
+          setBadgeRecords([]);
+        }
       }
     } catch {
       setUser(null);
@@ -351,6 +373,61 @@ export function AppProvider({ children }) {
     });
   }, [events, userLocation]);
 
+  const ownedBadges = useMemo(() => badgeRecords.map(b => b.badgeKey), [badgeRecords]);
+  const equippedBadges = useMemo(() => badgeRecords.filter(b => b.equipped !== false).map(b => b.badgeKey), [badgeRecords]);
+
+  const buyBadge = useCallback(async (badgeKey, label, priceInr = 49) => {
+    const userKey = String(user?.id || user?.username || 'guest');
+    if (ownedBadges.includes(badgeKey)) return;
+    if (user) {
+      try {
+        const res = await apiFetch('/api/badges/purchase', {
+          method: 'POST',
+          body: JSON.stringify({ badgeKey, priceInr })
+        });
+        if (res && Array.isArray(res.badges)) {
+          setBadgeRecords(res.badges);
+          localStorage.setItem(`serveo_category_badges_${userKey}`, JSON.stringify(res.badges.map(x => x.badgeKey)));
+          refreshEvents();
+          addToast(`"${label}" Verified Badge unlocked & equipped! Priority listing & perks are active.`);
+          return;
+        }
+      } catch (err) {
+        addToast(err.message || 'Could not save badge purchase');
+        return;
+      }
+    }
+    const next = [...badgeRecords, { badgeKey, equipped: true, priceInr }];
+    setBadgeRecords(next);
+    localStorage.setItem(`serveo_category_badges_${userKey}`, JSON.stringify(next.map(x => x.badgeKey)));
+    addToast(`"${label}" Verified Badge unlocked & equipped! (Demo checkout)`);
+  }, [user, ownedBadges, badgeRecords, addToast, refreshEvents]);
+
+  const toggleEquipBadge = useCallback(async (badgeKey) => {
+    const existing = badgeRecords.find(b => b.badgeKey === badgeKey);
+    if (!existing) return;
+    const nextEquipped = !(existing.equipped !== false);
+    if (user) {
+      try {
+        const res = await apiFetch(`/api/badges/${encodeURIComponent(badgeKey)}/equip`, {
+          method: 'PATCH',
+          body: JSON.stringify({ equipped: nextEquipped })
+        });
+        if (res && Array.isArray(res.badges)) {
+          setBadgeRecords(res.badges);
+          refreshEvents();
+          addToast(nextEquipped ? 'Badge equipped on your event cards & profile!' : 'Badge hidden from showcase.');
+          return;
+        }
+      } catch (err) {
+        addToast(err.message || 'Could not update badge status');
+        return;
+      }
+    }
+    setBadgeRecords(prev => prev.map(b => (b.badgeKey === badgeKey ? { ...b, equipped: nextEquipped } : b)));
+    addToast(nextEquipped ? 'Badge equipped on your cards & profile!' : 'Badge hidden from showcase.');
+  }, [user, badgeRecords, addToast, refreshEvents]);
+
   const value = {
     user,
     authLoaded,
@@ -377,6 +454,11 @@ export function AppProvider({ children }) {
     detectLocation,
     savedIds,
     toggleSaved,
+    ownedBadges,
+    equippedBadges,
+    badgeRecords,
+    buyBadge,
+    toggleEquipBadge,
     termsAccepted,
     acceptTerms
   };

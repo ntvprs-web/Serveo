@@ -1,40 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { Award, ShoppingBag, Clock } from 'lucide-react';
+import { Award, ShoppingBag, Clock, Sparkles, CheckCircle2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { CATEGORIES } from '../utils/constants';
+import { CATEGORIES, BADGE_OVERVIEW_BENEFITS, getBadgeDetails } from '../utils/constants';
 
 export default function BadgesShopPage() {
-  const { user, addToast } = useApp();
-
-  const userKey = String(user?.id || user?.username || 'guest');
-  const storageKey = `serveo_category_badges_${userKey}`;
-
-  const [ownedBadges, setOwnedBadges] = useState(() => {
-    try {
-      const val = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      return Array.isArray(val) ? val : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      const val = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      setOwnedBadges(Array.isArray(val) ? val : []);
-    } catch {
-      setOwnedBadges([]);
-    }
-  }, [storageKey]);
-
-  const handleBuyBadge = (catKey, label) => {
-    if (ownedBadges.includes(catKey)) return;
-    const next = [...ownedBadges, catKey];
-    setOwnedBadges(next);
-    localStorage.setItem(storageKey, JSON.stringify(next));
-    addToast(`"${label}" badge added to your verified collection! (Demo checkout)`);
-  };
+  const { user, ownedBadges, equippedBadges, buyBadge, toggleEquipBadge } = useApp();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -44,7 +15,7 @@ export default function BadgesShopPage() {
             Verified Badges <span className="serif-italic" style={{ fontSize: '1.75rem' }}>Shop</span>
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-            Choose an animated category badge to highlight your focus on matching event cards and organizer profiles
+            Unlock cause specialist seals, priority discovery ranking, and +25% civic impact standing across SERVEO.
           </p>
         </div>
         <Link to="/my-hours" className="pill-btn">
@@ -52,22 +23,62 @@ export default function BadgesShopPage() {
         </Link>
       </div>
 
-      {/* Demo Checkout Notice */}
-      <div className="card" style={{ padding: 16, background: 'var(--accent-gold-soft)', color: '#111827', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-        <div style={{ fontSize: '0.86rem' }}>
-          <strong>Demo Checkout:</strong> Badge purchases are simulated in this prototype and saved in your browser for{' '}
-          <strong>{user ? user.name : 'Guest'}</strong>. No payment is processed.
+      {/* Why Get a Verified Badge? Benefits Overview */}
+      <div className="card" style={{ padding: 20, background: 'linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface-muted) 100%)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <h2 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Sparkles size={18} color="#F59E0B" /> Why Buy a Verified Cause Badge?
+          </h2>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <span className="badge-pill" style={{ background: '#111827', color: '#FFFFFF' }}>
+              <Award size={13} /> {ownedBadges.length} Owned
+            </span>
+            <span className="badge-pill" style={{ background: '#D1FAE5', color: '#065F46' }}>
+              <ShieldCheck size={13} /> {equippedBadges.length} Equipped Live
+            </span>
+          </div>
         </div>
-        <span className="badge-pill" style={{ background: '#111827', color: '#FFFFFF' }}>
-          <Award size={13} /> {ownedBadges.length} Owned
-        </span>
+
+        <div className="grid-responsive-2" style={{ gap: 12 }}>
+          {BADGE_OVERVIEW_BENEFITS.map((b) => (
+            <div
+              key={b.id}
+              style={{
+                padding: 14,
+                borderRadius: 16,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)'
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 4 }}>{b.title}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>{b.detail}</div>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            marginTop: 14,
+            padding: '10px 14px',
+            borderRadius: 12,
+            background: 'var(--accent-gold-soft)',
+            color: '#111827',
+            fontSize: '0.82rem'
+          }}
+        >
+          <strong>{user ? 'Account Synced (Supabase):' : 'Demo Checkout:'}</strong>{' '}
+          {user
+            ? `Your badges are saved to your SERVEO account (${user.name}) and boost your hosted drives & volunteer standing automatically.`
+            : 'Badges are saved in your browser for Guest. Sign in anytime to sync badges to your SERVEO account and boost your hosted events.'}
+        </div>
       </div>
 
       {/* Badges Grid */}
       <div className="grid-responsive-3">
         {Object.values(CATEGORIES).map((cat, index) => {
-          const price = 49 + index * 10;
+          const { price, perks } = getBadgeDetails(cat, index);
           const isOwned = ownedBadges.includes(cat.key);
+          const isEquipped = equippedBadges.includes(cat.key);
           return (
             <div
               key={cat.key}
@@ -80,40 +91,76 @@ export default function BadgesShopPage() {
                 gap: 12
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div
-                  style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 16,
-                    background: cat.pastelBg,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.6rem',
-                    flexShrink: 0
-                  }}
-                >
-                  {cat.emoji}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 16,
+                      background: cat.pastelBg,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.6rem',
+                      flexShrink: 0
+                    }}
+                  >
+                    {cat.emoji}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '1.02rem' }}>{cat.label}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      ₹{price} · Lifetime Cause Badge
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '1.02rem' }}>{cat.label}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>₹{price} · Demo Badge</div>
-                </div>
+                {isOwned && (
+                  <span
+                    className="badge-pill"
+                    style={{
+                      background: isEquipped ? '#D1FAE5' : 'var(--bg-surface-muted)',
+                      color: isEquipped ? '#065F46' : 'var(--text-muted)',
+                      fontSize: '0.72rem'
+                    }}
+                  >
+                    {isEquipped ? 'Active' : 'Hidden'}
+                  </span>
+                )}
               </div>
-              <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Interactive {cat.label.toLowerCase()} badge for event cards and verified organizer highlights.
-              </p>
-              <button
-                type="button"
-                disabled={isOwned}
-                onClick={() => handleBuyBadge(cat.key, cat.label)}
-                className={`pill-btn ${isOwned ? '' : 'pill-btn-dark'}`}
-                style={{ width: '100%', marginTop: 'auto', opacity: isOwned ? 0.78 : 1 }}
-              >
-                <ShoppingBag size={14} />
-                <span>{isOwned ? '✓ Owned in Collection' : `Buy Demo Badge (₹${price})`}</span>
-              </button>
+
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {perks.map((perk) => (
+                  <li key={perk}>{perk}</li>
+                ))}
+              </ul>
+
+              {isOwned ? (
+                <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleEquipBadge(cat.key)}
+                    className={`pill-btn ${isEquipped ? '' : 'pill-btn-dark'}`}
+                    style={{ flex: 1 }}
+                  >
+                    {isEquipped ? <EyeOff size={14} /> : <Eye size={14} />}
+                    <span>{isEquipped ? 'Equipped (Hide)' : 'Equip on Cards'}</span>
+                  </button>
+                  <span className="pill-btn" style={{ background: cat.pastelBg, color: '#111827', cursor: 'default' }}>
+                    <CheckCircle2 size={14} /> Owned
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => buyBadge(cat.key, cat.label, price)}
+                  className="pill-btn pill-btn-dark"
+                  style={{ width: '100%', marginTop: 'auto' }}
+                >
+                  <ShoppingBag size={14} />
+                  <span>Unlock {cat.label} Badge (₹{price})</span>
+                </button>
+              )}
             </div>
           );
         })}

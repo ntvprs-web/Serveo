@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Award, Clock, Download, ShoppingBag, CheckCircle2 } from 'lucide-react';
+import { Award, Clock, Download, ShoppingBag, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiFetch } from '../utils/api';
-import { CATEGORIES } from '../utils/constants';
+import { CATEGORIES, getBadgeDetails } from '../utils/constants';
 
 const DEFAULT_SESSIONS = [
   {
@@ -57,30 +57,10 @@ const DEFAULT_SESSIONS = [
 ];
 
 export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
-  const { user, addToast } = useApp();
+  const { user, ownedBadges, equippedBadges, buyBadge, toggleEquipBadge } = useApp();
   const [sessions, setSessions] = useState(DEFAULT_SESSIONS);
   const [totalHours, setTotalHours] = useState(28.5);
-
-  const userKey = String(user?.id || user?.username || 'guest');
-  const storageKey = `serveo_category_badges_${userKey}`;
-
-  const [ownedBadges, setOwnedBadges] = useState(() => {
-    try {
-      const val = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      return Array.isArray(val) ? val : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      const val = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      setOwnedBadges(Array.isArray(val) ? val : []);
-    } catch {
-      setOwnedBadges([]);
-    }
-  }, [storageKey]);
+  const effectiveHours = ownedBadges.length > 0 ? totalHours * 1.25 : totalHours;
 
   useEffect(() => {
     if (!user) return;
@@ -93,14 +73,6 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
       })
       .catch(() => {});
   }, [user]);
-
-  const handleBuyBadge = (catKey, label) => {
-    if (ownedBadges.includes(catKey)) return;
-    const next = [...ownedBadges, catKey];
-    setOwnedBadges(next);
-    localStorage.setItem(storageKey, JSON.stringify(next));
-    addToast(`"${label}" badge added to your verified collection! (Demo checkout)`);
-  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -123,8 +95,10 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
       <div className="grid-responsive-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
         <div className="card" style={{ padding: 18 }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Verified Hours</div>
-          <div style={{ fontSize: '1.7rem', fontWeight: 800, marginTop: 4 }}>{totalHours.toFixed(1)} <small style={{ fontSize: '0.85rem' }}>HRS</small></div>
-          <div style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 600 }}>100% organizer confirmed</div>
+          <div style={{ fontSize: '1.7rem', fontWeight: 800, marginTop: 4 }}>{effectiveHours.toFixed(1)} <small style={{ fontSize: '0.85rem' }}>HRS</small></div>
+          <div style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 600 }}>
+            {ownedBadges.length > 0 ? '100% confirmed · +25% Badge Standing Bonus' : '100% organizer confirmed'}
+          </div>
         </div>
         <div className="card" style={{ padding: 18 }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Events Completed</div>
@@ -224,8 +198,9 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
 
         <div className="grid-responsive-3">
           {Object.values(CATEGORIES).map((cat, index) => {
-            const price = 49 + index * 10;
+            const { price, perks } = getBadgeDetails(cat, index);
             const isOwned = ownedBadges.includes(cat.key);
+            const isEquipped = equippedBadges.includes(cat.key);
             return (
               <div
                 key={cat.key}
@@ -245,21 +220,34 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
                   </div>
                   <div>
                     <div style={{ fontWeight: 700 }}>{cat.label}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>₹{price} · Demo Badge</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>₹{price} · Cause Badge</div>
                   </div>
                 </div>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Interactive {cat.label.toLowerCase()} badge for event cards and verified organizer highlights.
-                </p>
-                <button
-                  type="button"
-                  disabled={isOwned}
-                  onClick={() => handleBuyBadge(cat.key, cat.label)}
-                  className={`pill-btn ${isOwned ? '' : 'pill-btn-dark'}`}
-                  style={{ width: '100%', marginTop: 'auto', opacity: isOwned ? 0.75 : 1 }}
-                >
-                  {isOwned ? '✓ Owned in Collection' : `Buy Demo Badge (₹${price})`}
-                </button>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                  {perks.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+                {isOwned ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleEquipBadge(cat.key)}
+                    className={`pill-btn ${isEquipped ? '' : 'pill-btn-dark'}`}
+                    style={{ width: '100%', marginTop: 'auto' }}
+                  >
+                    {isEquipped ? <EyeOff size={14} /> : <Eye size={14} />}
+                    <span>{isEquipped ? 'Equipped (Hide)' : 'Equip on Cards'}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => buyBadge(cat.key, cat.label, price)}
+                    className="pill-btn pill-btn-dark"
+                    style={{ width: '100%', marginTop: 'auto' }}
+                  >
+                    {`Unlock Badge (₹${price})`}
+                  </button>
+                )}
               </div>
             );
           })}

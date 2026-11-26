@@ -45,6 +45,9 @@ class DatabaseManager {
         connectionTimeoutMillis: 10000,
         ...(isRemoteDb ? { ssl: { rejectUnauthorized: false } } : {}),
       });
+      this.pool.on('error', (err) => {
+        console.warn('⚠️ PostgreSQL idle pool client error:', err.message);
+      });
 
       // Test connection
       const client = await this.pool.connect();
@@ -151,6 +154,7 @@ class DatabaseManager {
     if (!Array.isArray(this.fallbackData.premium_activations)) this.fallbackData.premium_activations = [];
     if (!Array.isArray(this.fallbackData.website_inquiries)) this.fallbackData.website_inquiries = [];
     if (!Array.isArray(this.fallbackData.blood_donor_profiles)) this.fallbackData.blood_donor_profiles = [];
+    if (!Array.isArray(this.fallbackData.user_badges)) this.fallbackData.user_badges = [];
     if (!Array.isArray(this.fallbackData.volunteer_attendance_records)) this.fallbackData.volunteer_attendance_records = [];
     if (!Array.isArray(this.fallbackData.volunteer_hours_certificates)) this.fallbackData.volunteer_hours_certificates = [];
     if (!Array.isArray(this.fallbackData.impact_demo_monthly_samples)) this.fallbackData.impact_demo_monthly_samples = [];
@@ -427,7 +431,8 @@ class DatabaseManager {
       let query = `
         SELECT e.*, 
                ec.contact, ec.email as contact_email, ec.org_type,
-               u.organization_banned
+               u.organization_banned,
+               COALESCE((SELECT ARRAY_AGG(ub.badge_key) FROM user_badges ub WHERE ub.user_id = e.owner_id AND ub.equipped = TRUE), '{}') AS owner_badges
         FROM events e
         LEFT JOIN event_contacts ec ON e.id = ec.event_id
         LEFT JOIN users u ON e.owner_id = u.id
@@ -509,7 +514,14 @@ class DatabaseManager {
         });
       }
 
-      return list;
+      return list.map(ev => ({
+        ...ev,
+        ownerBadges: ev.ownerId
+          ? (this.fallbackData.user_badges || [])
+              .filter(b => String(b.userId) === String(ev.ownerId) && b.equipped !== false)
+              .map(b => b.badgeKey)
+          : []
+      }));
     }
   }
 
@@ -518,7 +530,8 @@ class DatabaseManager {
       const query = `
         SELECT e.*, 
                ec.contact, ec.email as contact_email, ec.org_type,
-               u.organization_banned
+               u.organization_banned,
+               COALESCE((SELECT ARRAY_AGG(ub.badge_key) FROM user_badges ub WHERE ub.user_id = e.owner_id AND ub.equipped = TRUE), '{}') AS owner_badges
         FROM events e
         LEFT JOIN event_contacts ec ON e.id = ec.event_id
         LEFT JOIN users u ON e.owner_id = u.id
@@ -533,7 +546,12 @@ class DatabaseManager {
       const ev = this.fallbackData.events.find(e => String(e.id) === String(id));
       if (!ev) return null;
       const contact = this.fallbackData.event_contacts[id] || null;
-      const event = { ...ev, contactInfo: contact };
+      const ownerBadges = ev.ownerId
+        ? (this.fallbackData.user_badges || [])
+            .filter(b => String(b.userId) === String(ev.ownerId) && b.equipped !== false)
+            .map(b => b.badgeKey)
+        : [];
+      const event = { ...ev, contactInfo: contact, ownerBadges };
       if (!['hidden', 'archived'].includes(event.status) && Date.parse(`${event.date}T${event.endTime || '23:59'}:00+05:30`) <= Date.now()) event.status = 'archived';
       return event;
     }
@@ -1918,6 +1936,7 @@ class DatabaseManager {
       description: r.description,
       donationLink: r.donation_link,
       tags: r.tags || [],
+      ownerBadges: Array.isArray(r.owner_badges) ? r.owner_badges : [],
       status: r.status,
       notifiedCount: r.notified_count,
       createdAt: r.created_at,
@@ -2027,6 +2046,80 @@ class DatabaseManager {
       }));
     }
     return [...(this.fallbackData.website_inquiries || [])].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  }
+
+  async getUserBadges(userId) {
+    if (this.mode === 'postgres') {
+      const { rows } = await this.pool.query(
+        `SELECT id, badge_key, equipped, price_inr, purchased_at
+         FROM user_badges WHERE user_id = $1 ORDER BY purchased_at ASC`,
+        [String(userId)]
+      );
+      return rows.map(r => ({
+        id: r.id,
+        badgeKey: r.badge_key,
+        equipped: Boolean(r.equipped),
+        priceInr: Number(r.price_inr) || 49,
+        purchasedAt: r.purchased_at
+      }));
+    }
+    return (this.fallbackData.user_badges || [])
+      .filter(b => String(b.userId) === String(userId))
+      .map(b => ({
+        id: b.id,
+        badgeKey: b.badgeKey,
+        equipped: b.equipped !== false,
+        priceInr: Number(b.priceInr) || 49,
+        purchasedAt: b.purchasedAt
+      }));
+  }
+
+  async purchaseUserBadge({ userId, badgeKey, priceInr = 49 }) {
+    const id = `badge_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const purchasedAt = new Date().toISOString();
+    if (this.mode === 'postgres') {
+      await this.pool.query(
+        `INSERT INTO user_badges (id, user_id, badge_key, equipped, price_inr, purchased_at)
+         VALUES ($1, $2, $3, TRUE, $4, $5)
+         ON CONFLICT (user_id, badge_key) DO NOTHING`,
+        [id, String(userId), String(badgeKey), Number(priceInr) || 49, purchasedAt]
+      );
+      return this.getUserBadges(userId);
+    }
+    if (!Array.isArray(this.fallbackData.user_badges)) this.fallbackData.user_badges = [];
+    const exists = this.fallbackData.user_badges.some(
+      b => String(b.userId) === String(userId) && b.badgeKey === String(badgeKey)
+    );
+    if (!exists) {
+      this.fallbackData.user_badges.push({
+        id,
+        userId: String(userId),
+        badgeKey: String(badgeKey),
+        equipped: true,
+        priceInr: Number(priceInr) || 49,
+        purchasedAt
+      });
+      this.saveFallback();
+    }
+    return this.getUserBadges(userId);
+  }
+
+  async setUserBadgeEquipped(userId, badgeKey, equipped) {
+    if (this.mode === 'postgres') {
+      const result = await this.pool.query(
+        `UPDATE user_badges SET equipped = $3 WHERE user_id = $1 AND badge_key = $2 RETURNING id`,
+        [String(userId), String(badgeKey), Boolean(equipped)]
+      );
+      if (!result.rowCount) return null;
+      return this.getUserBadges(userId);
+    }
+    const entry = (this.fallbackData.user_badges || []).find(
+      b => String(b.userId) === String(userId) && b.badgeKey === String(badgeKey)
+    );
+    if (!entry) return null;
+    entry.equipped = Boolean(equipped);
+    this.saveFallback();
+    return this.getUserBadges(userId);
   }
 }
 

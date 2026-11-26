@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PlusCircle, ShieldCheck, Users, CheckCircle2, Trash2 } from 'lucide-react';
+import { PlusCircle, ShieldCheck, Users, CheckCircle2, Trash2, Award } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiFetch, formatDateShort } from '../utils/api';
+import { CATEGORIES } from '../utils/constants';
 
 export default function OrganizerPage() {
-  const { user, addToast, refreshEvents } = useApp();
+  const { user, addToast, refreshEvents, equippedBadges } = useApp();
   const [myEvents, setMyEvents] = useState([]);
   const [verification, setVerification] = useState(null);
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -75,19 +76,43 @@ export default function OrganizerPage() {
       </div>
 
       {/* Verification Status Card */}
-      <div className="card" style={{ padding: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <CheckCircle2 size={22} color={verification?.verified ? '#10B981' : '#F59E0B'} />
-          <div>
-            <div style={{ fontWeight: 700 }}>
-              Verification Status: {verification?.status || (user.verified ? 'Verified' : 'Standard')}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Verified organizers receive priority badges on public listings.
+      <div className="card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <CheckCircle2 size={22} color={verification?.verified ? '#10B981' : '#F59E0B'} />
+            <div>
+              <div style={{ fontWeight: 700 }}>
+                Verification Status: {verification?.status || (user.verified ? 'Verified' : 'Standard')}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                {equippedBadges.length > 0
+                  ? `${equippedBadges.length} Cause Specialist Badge${equippedBadges.length > 1 ? 's' : ''} active — priority listing boost & specialist card seals enabled.`
+                  : 'Equip a Verified Cause Badge to unlock priority ranking & specialist seals on your hosted drives.'}
+              </div>
             </div>
           </div>
+          <Link to="/badges" className="pill-btn">
+            <Award size={14} /> {equippedBadges.length > 0 ? 'Manage Badges' : 'Unlock Organizer Badges'}
+          </Link>
         </div>
-        <Link to="/badges" className="pill-btn">View Organizer Badges</Link>
+
+        {equippedBadges.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {equippedBadges.map((key) => {
+              const cat = CATEGORIES[key];
+              if (!cat) return null;
+              return (
+                <span
+                  key={key}
+                  className="badge-pill"
+                  style={{ background: cat.pastelBg, color: '#111827', border: `1px solid ${cat.color}` }}
+                >
+                  {cat.emoji} {cat.label} Specialist Active
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Hosted Events */}

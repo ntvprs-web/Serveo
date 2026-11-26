@@ -1,14 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Bookmark, Share2, Calendar, MapPin, CheckCircle2, Users } from 'lucide-react';
+import { Bookmark, Share2, Calendar, MapPin, CheckCircle2, Users, Award } from 'lucide-react';
 import { getCategoryInfo } from '../utils/constants';
 import { formatDateShort } from '../utils/api';
 import { useApp } from '../context/AppContext';
 
 export default function EventCard({ event, variant = 'standard' }) {
-  const { savedIds, toggleSaved, addToast } = useApp();
+  const { user, savedIds, toggleSaved, addToast, equippedBadges } = useApp();
   const cat = getCategoryInfo(event.category);
   const isSaved = savedIds.includes(String(event.id));
+  const ownerBadges = Array.isArray(event.ownerBadges) ? event.ownerBadges : [];
+  const isOwnEquipped = Boolean(user && event.ownerId && String(event.ownerId) === String(user.id) && equippedBadges.includes(event.category));
+  const hasSpecialistBadge = ownerBadges.includes(event.category) || isOwnEquipped;
   const needed = Number(event.volunteersNeeded) || 1;
   const joined = Number(event.volunteersJoined) || 0;
   const pct = Math.min(100, Math.round((joined / needed) * 100));
@@ -207,9 +210,26 @@ export default function EventCard({ event, variant = 'standard' }) {
 
       {/* Card Body */}
       <div style={{ padding: '12px 6px 6px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-          <span>{event.organizer}</span>
-          {event.verified && <CheckCircle2 size={14} color="#10B981" />}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span>{event.organizer}</span>
+            {event.verified && <CheckCircle2 size={14} color="#10B981" />}
+          </span>
+          {hasSpecialistBadge && (
+            <span
+              className="badge-pill"
+              style={{
+                background: cat.pastelBg,
+                color: '#111827',
+                border: `1px solid ${cat.color}`,
+                padding: '2px 8px',
+                fontSize: '0.68rem'
+              }}
+              title={`Host holds the Verified ${cat.label} Specialist Badge`}
+            >
+              <Award size={11} color={cat.color} /> Specialist
+            </span>
+          )}
         </div>
 
         <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, lineHeight: 1.3 }}>

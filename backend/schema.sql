@@ -413,3 +413,14 @@ CREATE TABLE IF NOT EXISTS blood_donor_profiles (
     consent_alerts BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS user_badges (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    badge_key VARCHAR(64) NOT NULL,
+    equipped BOOLEAN NOT NULL DEFAULT TRUE,
+    price_inr INTEGER NOT NULL DEFAULT 49,
+    purchased_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, badge_key)
+);
+CREATE INDEX IF NOT EXISTS idx_user_badges_user_equipped ON user_badges(user_id, equipped);

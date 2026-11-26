@@ -1508,6 +1508,47 @@ app.get('/api/admin/inquiries', authenticateRequired, requireAdmin, async (_req,
   }
 });
 
+// Verified Category Badges (persisted to Supabase & applied to event cards / perks)
+app.get('/api/badges/mine', authenticateRequired, async (req, res) => {
+  try {
+    res.json({ badges: await db.getUserBadges(req.user.id) });
+  } catch (err) {
+    res.status(500).json({ error: 'BADGE_LOAD_FAILED', message: err.message });
+  }
+});
+
+app.post('/api/badges/purchase', authenticateRequired, async (req, res) => {
+  const badgeKey = String(req.body?.badgeKey || '').trim().toLowerCase();
+  const priceInr = Number(req.body?.priceInr);
+  if (!badgeKey || badgeKey.length > 64) {
+    return res.status(400).json({ error: 'INVALID_BADGE', message: 'Choose a valid verified category badge.' });
+  }
+  try {
+    const badges = await db.purchaseUserBadge({
+      userId: req.user.id,
+      badgeKey,
+      priceInr: Number.isFinite(priceInr) && priceInr > 0 ? Math.round(priceInr) : 49
+    });
+    broadcastEvent('EVENT_UPDATED', { userId: req.user.id });
+    res.status(201).json({ success: true, badges });
+  } catch (err) {
+    res.status(500).json({ error: 'BADGE_PURCHASE_FAILED', message: err.message });
+  }
+});
+
+app.patch('/api/badges/:badgeKey/equip', authenticateRequired, async (req, res) => {
+  const badgeKey = String(req.params.badgeKey || '').trim().toLowerCase();
+  const equipped = Boolean(req.body?.equipped);
+  try {
+    const badges = await db.setUserBadgeEquipped(req.user.id, badgeKey, equipped);
+    if (!badges) return res.status(404).json({ error: 'BADGE_NOT_FOUND', message: 'You do not own this badge yet.' });
+    broadcastEvent('EVENT_UPDATED', { userId: req.user.id });
+    res.json({ success: true, badges });
+  } catch (err) {
+    res.status(500).json({ error: 'BADGE_EQUIP_FAILED', message: err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({

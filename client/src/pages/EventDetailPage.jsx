@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  Award,
   Bookmark,
   Calendar,
   CheckCircle2,
@@ -18,7 +19,7 @@ import { apiFetch, formatDateShort, getDirectionsUrl } from '../utils/api';
 export default function EventDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, savedIds, toggleSaved, addToast, refreshEvents } = useApp();
+  const { user, savedIds, toggleSaved, addToast, refreshEvents, ownedBadges, equippedBadges } = useApp();
 
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -84,6 +85,10 @@ export default function EventDetailPage() {
 
   const cat = getCategoryInfo(event.category);
   const isSaved = savedIds.includes(String(event.id));
+  const hostHasSpecialistBadge =
+    (Array.isArray(event.ownerBadges) && event.ownerBadges.includes(event.category)) ||
+    Boolean(user && event.ownerId && String(event.ownerId) === String(user.id) && equippedBadges.includes(event.category));
+  const volunteerHasSpecialistBadge = ownedBadges.includes(event.category);
 
   const handleQuickJoin = async () => {
     try {
@@ -188,6 +193,16 @@ export default function EventDetailPage() {
           {event.verified && (
             <span className="badge-pill" style={{ background: '#D1FAE5', color: '#065F46' }}>
               <CheckCircle2 size={13} /> Verified Organizer
+            </span>
+          )}
+          {hostHasSpecialistBadge && (
+            <span className="badge-pill" style={{ background: cat.pastelBg, color: '#111827', border: `1px solid ${cat.color}` }}>
+              <Award size={13} color={cat.color} /> Verified {cat.label} Specialist Host
+            </span>
+          )}
+          {volunteerHasSpecialistBadge && (
+            <span className="badge-pill" style={{ background: 'var(--accent-gold-soft)', color: '#111827' }}>
+              ★ Your {cat.label} Badge: Priority Roster & +25% Bonus Active
             </span>
           )}
         </div>

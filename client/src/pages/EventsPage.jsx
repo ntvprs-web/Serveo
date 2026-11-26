@@ -43,7 +43,12 @@ export default function EventsPage() {
           (b.volunteersNeeded - b.volunteersJoined) - (a.volunteersNeeded - a.volunteersJoined)
       );
     } else {
-      list.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+      list.sort((a, b) => {
+        const aBoost = Array.isArray(a.ownerBadges) && a.ownerBadges.includes(a.category) ? 1 : 0;
+        const bBoost = Array.isArray(b.ownerBadges) && b.ownerBadges.includes(b.category) ? 1 : 0;
+        if (bBoost !== aBoost) return bBoost - aBoost;
+        return String(a.date || '').localeCompare(String(b.date || ''));
+      });
     }
     return list;
   }, [events, query, selectedCategory, sortBy, savedIds]);
