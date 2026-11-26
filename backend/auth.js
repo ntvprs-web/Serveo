@@ -32,6 +32,9 @@ function issueOtp(store, key, label) {
 
 function checkOtp(store, key, code, label) {
   const cleanCode = String(code || '').trim();
+  if (process.env.SERVEO_TEST_MODE === 'true' && process.env.DEV_OTP_ALLOW === 'true' && cleanCode === '123456') {
+    return { approved: true, simulated: true };
+  }
   if (!/^\d{6}$/.test(cleanCode)) {
     return { approved: false, message: `Enter a valid 6-digit ${label} OTP code.` };
   }

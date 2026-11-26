@@ -43,7 +43,7 @@ app.use(helmet({
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://api.mapbox.com", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://api.mapbox.com", "https://*.mapbox.com", "https://*.tile.openstreetmap.org", "https://images.unsplash.com", "https://www.gstatic.com"],
-      connectSrc: ["'self'", "https://api.mapbox.com", "https://*.mapbox.com", "https://events.mapbox.com", "https://india-lgd-index-api.vercel.app", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://*.googleapis.com", "http://localhost:*", "http://127.0.0.1:*"],
+      connectSrc: ["'self'", "https://api.mapbox.com", "https://*.mapbox.com", "https://events.mapbox.com", "https://india-lgd-index-api.vercel.app", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://*.googleapis.com", "https://*.supabase.co", "http://localhost:*", "http://127.0.0.1:*"],
       frameSrc: ["'self'", "https://*.firebaseapp.com", "https://www.google.com"],
       workerSrc: ["'self'", "blob:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
@@ -416,6 +416,92 @@ app.post('/api/auth/login-otp', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'OTP_LOGIN_FAILED', message: err.message });
+  }
+});
+
+// Supabase Email/Phone OTP verified authentication bridge
+app.post('/api/auth/supabase', async (req, res) => {
+  try {
+    const { accessToken, name, username, bloodGroup } = req.body || {};
+    if (!accessToken) {
+      return res.status(400).json({ error: 'MISSING_ACCESS_TOKEN', message: 'Supabase access token is required.' });
+    }
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return res.status(503).json({ error: 'SUPABASE_AUTH_NOT_CONFIGURED', message: 'Supabase URL/Anon key not configured on server.' });
+    }
+
+    // Verify the Supabase JWT directly against Supabase Auth /auth/v1/user
+    const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        Authorization: `Bearer ${String(accessToken).trim()}`,
+        apikey: supabaseAnonKey
+      }
+    });
+    if (!userRes.ok) {
+      return res.status(401).json({ error: 'INVALID_SUPABASE_SESSION', message: 'Supabase session expired or invalid. Please verify OTP again.' });
+    }
+    const sbUser = await userRes.json();
+    const verifiedEmail = sbUser.email ? String(sbUser.email).trim().toLowerCase() : null;
+    const verifiedPhone = sbUser.phone ? normalizeIndianPhone(sbUser.phone) : null;
+
+    if (!verifiedEmail && !verifiedPhone) {
+      return res.status(400).json({ error: 'NO_VERIFIED_IDENTITY', message: 'Supabase user has neither verified email nor phone.' });
+    }
+
+    let user = (verifiedPhone && await db.findUserByIdentifier(verifiedPhone)) ||
+               (verifiedEmail && await db.findUserByIdentifier(verifiedEmail));
+
+    if (!user) {
+      const randomPass = crypto.randomBytes(24).toString('hex');
+      const passwordHash = await bcrypt.hash(randomPass, 10);
+      const baseUsername = (username || (verifiedEmail ? verifiedEmail.split('@')[0] : `user_${String(sbUser.id).slice(0, 8)}`))
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '_')
+        .slice(0, 28);
+      const uniqueSuffix = Math.floor(100 + Math.random() * 900);
+      const existingUsername = await db.findUserByIdentifier(baseUsername);
+      const finalUsername = existingUsername ? `${baseUsername}_${uniqueSuffix}` : baseUsername;
+      const displayName = (name && String(name).trim()) ||
+        (verifiedEmail ? verifiedEmail.split('@')[0] : 'SERVEO Member');
+
+      user = await db.createUser({
+        name: displayName,
+        username: finalUsername,
+        email: verifiedEmail || `${finalUsername}@phone.serveo.in`,
+        phone: verifiedPhone || `+919000000${uniqueSuffix}`,
+        passwordHash,
+        bloodGroup: bloodGroup || null
+      });
+    }
+
+    if (user.organizationBanned) {
+      return res.status(403).json({
+        error: 'ACCOUNT_BANNED',
+        message: 'This organizer account has been suspended due to verified community false-alarm reviews.'
+      });
+    }
+
+    const token = generateToken(user);
+    setAuthCookie(res, token);
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        bloodGroup: user.bloodGroup || null,
+        isAdmin: user.isAdmin,
+        organizationBanned: user.organizationBanned
+      },
+      token
+    });
+  } catch (err) {
+    console.error('Supabase auth bridge error:', err);
+    res.status(500).json({ error: 'SUPABASE_AUTH_FAILED', message: err.message || 'Could not verify Supabase session.' });
   }
 });
 
