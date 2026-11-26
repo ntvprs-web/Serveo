@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PlusCircle, ShieldCheck, Users, CheckCircle2, Trash2, Award } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiFetch, formatDateShort } from '../utils/api';
-import { CATEGORIES } from '../utils/constants';
+import { CATEGORIES, getOrganizerStarTier, getNextOrganizerStarTier } from '../utils/constants';
 
 export default function OrganizerPage() {
   const { user, addToast, refreshEvents, equippedBadges } = useApp();
@@ -59,6 +59,9 @@ export default function OrganizerPage() {
     );
   }
 
+  const currentStar = getOrganizerStarTier(myEvents.length);
+  const nextStar = getNextOrganizerStarTier(myEvents.length);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -113,6 +116,28 @@ export default function OrganizerPage() {
             })}
           </div>
         )}
+
+        {/* Free Community Milestone Star Tier */}
+        <div style={{ padding: 12, borderRadius: 14, background: 'var(--bg-surface-muted)', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: '1.3rem' }}>{currentStar ? currentStar.emoji : '🌱'}</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>
+                Community Star Tier: {currentStar ? `${currentStar.label} (${currentStar.minEvents}+ Events)` : 'Starter Community'}
+              </div>
+              <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                {nextStar
+                  ? `${myEvents.length} hosted events · Host ${nextStar.minEvents - myEvents.length} more to unlock ${nextStar.emoji} ${nextStar.label} (${nextStar.minEvents}+)`
+                  : `Maximum Diamond Star Tier unlocked (${myEvents.length} hosted events)!`}
+              </div>
+            </div>
+          </div>
+          {currentStar && (
+            <span className="badge-pill" style={{ background: currentStar.bg, color: '#111827', border: `1px solid ${currentStar.color}` }}>
+              {currentStar.emoji} {currentStar.label}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Hosted Events */}

@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Award, ShoppingBag, Clock, Sparkles, CheckCircle2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { CATEGORIES, BADGE_OVERVIEW_BENEFITS, getBadgeDetails } from '../utils/constants';
+import { CATEGORIES, BADGE_OVERVIEW_BENEFITS, getBadgeDetails, ORGANIZER_STAR_TIERS } from '../utils/constants';
 
 export default function BadgesShopPage() {
   const { user, ownedBadges, equippedBadges, buyBadge, toggleEquipBadge } = useApp();
@@ -12,15 +12,46 @@ export default function BadgesShopPage() {
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '1.55rem', fontWeight: 800 }}>
-            Verified Badges <span className="serif-italic" style={{ fontSize: '1.75rem' }}>Shop</span>
+            Organizer Verified Badges <span className="serif-italic" style={{ fontSize: '1.75rem' }}>Shop</span>
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-            Unlock cause specialist seals, priority discovery ranking, and +25% civic impact standing across SERVEO.
+            For Organizations & Event Hosts: boost event reach, unlock specialist seals, and rank higher in discovery. (Volunteer badges are 100% free in My Hours!)
           </p>
         </div>
         <Link to="/my-hours" className="pill-btn">
-          <Clock size={15} /> View My Hours
+          <Clock size={15} /> Free Volunteer Badges
         </Link>
+      </div>
+
+      {/* Community Milestone Star Tiers (Free Automatic Organizer Tiers) */}
+      <div className="card" style={{ padding: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
+            Free Community & Organization Milestone Stars
+          </h2>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            Earned automatically as your community hosts more verified events
+          </span>
+        </div>
+        <div className="h-scroll">
+          {[...ORGANIZER_STAR_TIERS].reverse().map((t) => (
+            <div
+              key={t.id}
+              className="badge-pill"
+              style={{
+                background: t.bg,
+                color: '#111827',
+                border: `1px solid ${t.color}`,
+                flexShrink: 0,
+                padding: '6px 12px',
+                fontSize: '0.8rem'
+              }}
+            >
+              <span>{t.emoji}</span>
+              <span><strong>{t.label}</strong> · {t.minEvents}+ Events</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Why Get a Verified Badge? Benefits Overview */}

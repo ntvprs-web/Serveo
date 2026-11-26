@@ -432,7 +432,8 @@ class DatabaseManager {
         SELECT e.*, 
                ec.contact, ec.email as contact_email, ec.org_type,
                u.organization_banned,
-               COALESCE((SELECT ARRAY_AGG(ub.badge_key) FROM user_badges ub WHERE ub.user_id = e.owner_id AND ub.equipped = TRUE), '{}') AS owner_badges
+               COALESCE((SELECT ARRAY_AGG(ub.badge_key) FROM user_badges ub WHERE ub.user_id = e.owner_id AND ub.equipped = TRUE), '{}') AS owner_badges,
+               (SELECT COUNT(*)::int FROM events e2 WHERE LOWER(e2.organizer) = LOWER(e.organizer) AND e2.status IN ('approved', 'completed', 'archived')) AS organizer_event_count
         FROM events e
         LEFT JOIN event_contacts ec ON e.id = ec.event_id
         LEFT JOIN users u ON e.owner_id = u.id
@@ -520,7 +521,11 @@ class DatabaseManager {
           ? (this.fallbackData.user_badges || [])
               .filter(b => String(b.userId) === String(ev.ownerId) && b.equipped !== false)
               .map(b => b.badgeKey)
-          : []
+          : [],
+        organizerEventCount: this.fallbackData.events.filter(
+          other => ['approved', 'completed', 'archived'].includes(other.status) &&
+            String(other.organizer || '').toLowerCase() === String(ev.organizer || '').toLowerCase()
+        ).length
       }));
     }
   }
@@ -531,7 +536,8 @@ class DatabaseManager {
         SELECT e.*, 
                ec.contact, ec.email as contact_email, ec.org_type,
                u.organization_banned,
-               COALESCE((SELECT ARRAY_AGG(ub.badge_key) FROM user_badges ub WHERE ub.user_id = e.owner_id AND ub.equipped = TRUE), '{}') AS owner_badges
+               COALESCE((SELECT ARRAY_AGG(ub.badge_key) FROM user_badges ub WHERE ub.user_id = e.owner_id AND ub.equipped = TRUE), '{}') AS owner_badges,
+               (SELECT COUNT(*)::int FROM events e2 WHERE LOWER(e2.organizer) = LOWER(e.organizer) AND e2.status IN ('approved', 'completed', 'archived')) AS organizer_event_count
         FROM events e
         LEFT JOIN event_contacts ec ON e.id = ec.event_id
         LEFT JOIN users u ON e.owner_id = u.id
@@ -1937,6 +1943,7 @@ class DatabaseManager {
       donationLink: r.donation_link,
       tags: r.tags || [],
       ownerBadges: Array.isArray(r.owner_badges) ? r.owner_badges : [],
+      organizerEventCount: Number(r.organizer_event_count) || 0,
       status: r.status,
       notifiedCount: r.notified_count,
       createdAt: r.created_at,

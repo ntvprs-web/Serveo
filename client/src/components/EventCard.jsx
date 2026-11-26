@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Bookmark, Share2, Calendar, MapPin, CheckCircle2, Users, Award } from 'lucide-react';
-import { getCategoryInfo } from '../utils/constants';
+import { getCategoryInfo, getOrganizerStarTier } from '../utils/constants';
 import { formatDateShort } from '../utils/api';
 import { useApp } from '../context/AppContext';
 
@@ -12,6 +12,7 @@ export default function EventCard({ event, variant = 'standard' }) {
   const ownerBadges = Array.isArray(event.ownerBadges) ? event.ownerBadges : [];
   const isOwnEquipped = Boolean(user && event.ownerId && String(event.ownerId) === String(user.id) && equippedBadges.includes(event.category));
   const hasSpecialistBadge = ownerBadges.includes(event.category) || isOwnEquipped;
+  const starTier = getOrganizerStarTier(event.organizerEventCount);
   const needed = Number(event.volunteersNeeded) || 1;
   const joined = Number(event.volunteersJoined) || 0;
   const pct = Math.min(100, Math.round((joined / needed) * 100));
@@ -215,7 +216,7 @@ export default function EventCard({ event, variant = 'standard' }) {
             <span>{event.organizer}</span>
             {event.verified && <CheckCircle2 size={14} color="#10B981" />}
           </span>
-          {hasSpecialistBadge && (
+          {hasSpecialistBadge ? (
             <span
               className="badge-pill"
               style={{
@@ -229,7 +230,21 @@ export default function EventCard({ event, variant = 'standard' }) {
             >
               <Award size={11} color={cat.color} /> Specialist
             </span>
-          )}
+          ) : starTier ? (
+            <span
+              className="badge-pill"
+              style={{
+                background: starTier.bg,
+                color: '#111827',
+                border: `1px solid ${starTier.color}`,
+                padding: '2px 8px',
+                fontSize: '0.68rem'
+              }}
+              title={`${event.organizer} has hosted ${event.organizerEventCount}+ events`}
+            >
+              {starTier.emoji} {starTier.label}
+            </span>
+          ) : null}
         </div>
 
         <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, lineHeight: 1.3 }}>

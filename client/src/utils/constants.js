@@ -214,3 +214,80 @@ export function getBadgeDetails(cat, index = 0) {
     ]
   };
 }
+
+export const VOLUNTEER_FREE_BADGES = [
+  {
+    id: 'blood-lifesaver',
+    emoji: '🩸',
+    title: 'Life Saver',
+    subtitle: 'Blood Donor Hero',
+    description: 'Earned free by donating blood or responding to an Urgent Blood Request.',
+    color: '#EF4444',
+    bg: '#FEE2E2'
+  },
+  {
+    id: 'first-responder',
+    emoji: '⚡',
+    title: 'First Responder',
+    subtitle: '1+ Verified Drive',
+    description: 'Earned free on your first verified community event or check-in.',
+    color: '#F59E0B',
+    bg: '#FEF3C7'
+  },
+  {
+    id: 'hunger-hero',
+    emoji: '🍱',
+    title: 'Hunger Hero',
+    subtitle: 'Food Rescue Support',
+    description: 'Earned free by supporting Food Distribution or Surplus Food Rescue.',
+    color: '#EA580C',
+    bg: '#FFEDD5'
+  },
+  {
+    id: 'disaster-shield',
+    emoji: '🆘',
+    title: 'Disaster Shield',
+    subtitle: 'Emergency Aid',
+    description: 'Earned free by joining Disaster Relief & critical response drives.',
+    color: '#DC2626',
+    bg: '#FEE2E2'
+  },
+  {
+    id: 'green-guardian',
+    emoji: '🌱',
+    title: 'Green Guardian',
+    subtitle: 'Environment & Care',
+    description: 'Earned free by volunteering for Afforestation or Animal Rescue drives.',
+    color: '#10B981',
+    bg: '#D1FAE5'
+  },
+  {
+    id: 'hours-champion-25',
+    emoji: '🏅',
+    title: '25+ Hours Champion',
+    subtitle: 'Civic Milestone',
+    description: 'Earned free when you reach 25+ verified community service hours.',
+    color: '#8B5CF6',
+    bg: '#EDE9FE'
+  }
+];
+
+export const ORGANIZER_STAR_TIERS = [
+  { minEvents: 500, id: 'diamond', emoji: '💎', label: 'Diamond Star', color: '#0EA5E9', bg: '#E0F2FE' },
+  { minEvents: 250, id: 'gold', emoji: '🥇', label: 'Gold Star', color: '#D97706', bg: '#FEF3C7' },
+  { minEvents: 100, id: 'silver', emoji: '🥈', label: 'Silver Star', color: '#475569', bg: '#F1F5F9' },
+  { minEvents: 50, id: 'bronze', emoji: '🥉', label: 'Bronze Star', color: '#B45309', bg: '#FFEDD5' },
+  { minEvents: 20, id: 'active', emoji: '⭐', label: 'Active Host', color: '#059669', bg: '#D1FAE5' },
+  { minEvents: 5, id: 'rising', emoji: '🌟', label: 'Rising Community', color: '#6366F1', bg: '#E0E7FF' }
+];
+
+export function getOrganizerStarTier(eventCount) {
+  const count = Number(eventCount) || 0;
+  return ORGANIZER_STAR_TIERS.find((t) => count >= t.minEvents) || null;
+}
+
+export function getNextOrganizerStarTier(eventCount) {
+  const count = Number(eventCount) || 0;
+  const ascending = [...ORGANIZER_STAR_TIERS].reverse();
+  return ascending.find((t) => count < t.minEvents) || null;
+}

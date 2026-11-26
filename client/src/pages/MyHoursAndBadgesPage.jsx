@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Award, Clock, Download, ShoppingBag, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { Award, Clock, Download, ShoppingBag, CheckCircle2, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiFetch } from '../utils/api';
-import { CATEGORIES, getBadgeDetails } from '../utils/constants';
+import { CATEGORIES, getBadgeDetails, VOLUNTEER_FREE_BADGES } from '../utils/constants';
 
 const DEFAULT_SESSIONS = [
   {
@@ -60,6 +60,7 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
   const { user, ownedBadges, equippedBadges, buyBadge, toggleEquipBadge } = useApp();
   const [sessions, setSessions] = useState(DEFAULT_SESSIONS);
   const [totalHours, setTotalHours] = useState(28.5);
+  const [bloodDonationsCount, setBloodDonationsCount] = useState(0);
   const effectiveHours = ownedBadges.length > 0 ? totalHours * 1.25 : totalHours;
 
   useEffect(() => {
@@ -72,7 +73,25 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
         }
       })
       .catch(() => {});
+    apiFetch('/api/donors/donations/mine')
+      .then((d) => {
+        const list = Array.isArray(d) ? d : (d?.donations || []);
+        setBloodDonationsCount(list.length);
+      })
+      .catch(() => {});
   }, [user]);
+
+  const unlockedFreeBadges = VOLUNTEER_FREE_BADGES.map((badge) => {
+    const categoriesText = sessions.map((s) => `${s.category || ''} ${s.title || ''}`).join(' ').toLowerCase();
+    let earned = false;
+    if (badge.id === 'blood-lifesaver') earned = bloodDonationsCount > 0 || Boolean(user?.bloodGroup) || categoriesText.includes('blood');
+    else if (badge.id === 'first-responder') earned = sessions.length >= 1;
+    else if (badge.id === 'hunger-hero') earned = categoriesText.includes('food');
+    else if (badge.id === 'disaster-shield') earned = categoriesText.includes('disaster');
+    else if (badge.id === 'green-guardian') earned = categoriesText.includes('environment') || categoriesText.includes('animal') || categoriesText.includes('afforestation');
+    else if (badge.id === 'hours-champion-25') earned = totalHours >= 25;
+    return { ...badge, earned };
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -180,15 +199,75 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
         </div>
       </div>
 
-      {/* Verified Badges Shop (from frontend/badges.html & js/badges.js) */}
+      {/* Free Volunteer Achievement Badges (earned automatically, never purchased) */}
       <div className="card" style={{ padding: 22 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ShoppingBag size={20} color="#F97352" /> Verified Badges Shop
+              <Sparkles size={20} color="#10B981" /> Free Volunteer Achievement Badges
             </h2>
             <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Demo checkout: Badges are saved in your browser for {user ? user.name : 'Guest'}.
+              100% free — earned automatically by saving lives in urgent blood requests, rescuing food, and completing volunteer hours.
+            </p>
+          </div>
+          <span className="badge-pill" style={{ background: '#D1FAE5', color: '#065F46' }}>
+            <Award size={13} /> {unlockedFreeBadges.filter((b) => b.earned).length}/{unlockedFreeBadges.length} Unlocked
+          </span>
+        </div>
+
+        <div className="grid-responsive-3">
+          {unlockedFreeBadges.map((b) => (
+            <div
+              key={b.id}
+              style={{
+                padding: 16,
+                borderRadius: 18,
+                background: 'var(--bg-surface-muted)',
+                border: b.earned ? `2px solid ${b.color}` : '1px dashed var(--border-subtle)',
+                opacity: b.earned ? 1 : 0.72,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 14, background: b.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
+                    {b.emoji}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{b.title}</div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{b.subtitle}</div>
+                  </div>
+                </div>
+                <span
+                  className="badge-pill"
+                  style={{
+                    background: b.earned ? '#D1FAE5' : 'var(--bg-surface)',
+                    color: b.earned ? '#065F46' : 'var(--text-muted)',
+                    fontSize: '0.7rem'
+                  }}
+                >
+                  {b.earned ? '✓ Earned (Free)' : 'Locked'}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.79rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                {b.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {mode === 'badges' && (
+      <div className="card" style={{ padding: 22 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ShoppingBag size={20} color="#F97352" /> Organizer Reach & Category Badges
+            </h2>
+            <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              For organizers & NGOs hosting events: boost reach on Discover & Event Cards ({user ? user.name : 'Guest'}).
             </p>
           </div>
           <span className="badge-pill" style={{ background: 'var(--accent-gold-soft)', color: '#111827' }}>
@@ -253,6 +332,7 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
           })}
         </div>
       </div>
+      )}
     </div>
   );
 }
