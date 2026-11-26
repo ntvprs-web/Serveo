@@ -14,9 +14,10 @@ const SDG_ITEMS = [
 ];
 
 const TEAM = [
-  { name: 'Nishant Swami', role: 'Lead Developer · Research & Outreach', emoji: '👨‍💻' },
-  { name: 'Nivesh Tyagi', role: 'Full Stack Developer · Research & Outreach', emoji: '🚀' },
-  { name: 'Piyush Chaudhary', role: 'UI/UX Designer · Research & Outreach', emoji: '🎨' }
+  { name: 'Nivesh Kumar Tyagi', role: 'Team Lead · Full Stack Architect', emoji: '🚀' },
+  { name: 'Nishant Swami', role: 'Lead Backend & Systems Developer', emoji: '👨‍💻' },
+  { name: 'Piyush Chaudhary', role: 'UI/UX & Product Designer', emoji: '🎨' },
+  { name: 'Nandani Chauhan', role: 'Marketing, Communications & Community Outreach', emoji: '📣' }
 ];
 
 export function AboutPage() {
@@ -112,7 +113,7 @@ export function AboutPage() {
       {/* Hosting Services */}
       <div className="card" style={{ padding: 24 }}>
         <h2 style={{ margin: '0 0 14px', fontSize: '1.25rem' }}>Hosting Services for Event Organizers</h2>
-        <div className="grid-responsive-3">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
           {HOSTING_PACKAGES.map((pkg) => (
             <div key={pkg.id} style={{ padding: 16, borderRadius: 18, background: 'var(--bg-surface-muted)' }}>
               <div style={{ fontWeight: 700, marginBottom: 4 }}>{pkg.name}</div>
@@ -137,7 +138,7 @@ export function AboutPage() {
         <p style={{ margin: '0 0 14px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
           Built by CSE (AI) students at ABES Institute of Technology, Ghaziabad.
         </p>
-        <div className="grid-responsive-3">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
           {TEAM.map((m) => (
             <div key={m.name} style={{ padding: 16, borderRadius: 18, background: 'var(--bg-surface-muted)', textAlign: 'center' }}>
               <div style={{ fontSize: '2rem', marginBottom: 6 }}>{m.emoji}</div>
