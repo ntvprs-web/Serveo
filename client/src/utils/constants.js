@@ -1,5 +1,4 @@
-export const MAPBOX_TOKEN =
-  'REPLACE_WITH_MAPBOX_TOKEN';
+export const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 export const MAPBOX_STYLE = 'mapbox://styles/mapbox/outdoors-v12';
 
