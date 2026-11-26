@@ -29,7 +29,6 @@ export default function LoginPage() {
   const [loginDigits, setLoginDigits] = useState('');
   const [loginOtp, setLoginOtp] = useState('');
   const [loginOtpSent, setLoginOtpSent] = useState(false);
-  const [loginPreviewOtp, setLoginPreviewOtp] = useState('');
 
   // Signup fields
   const [name, setName] = useState('');
@@ -37,12 +36,10 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [emailOtpCode, setEmailOtpCode] = useState('');
   const [emailOtpSent, setEmailOtpSent] = useState(false);
-  const [emailPreviewOtp, setEmailPreviewOtp] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [bloodGroup, setBloodGroup] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [signupPreviewOtp, setSignupPreviewOtp] = useState('');
   const [busy, setBusy] = useState(false);
 
   const emailInvalid = email.trim().length > 0 && !EMAIL_RE.test(email.trim());
@@ -80,7 +77,6 @@ export default function LoginPage() {
         body: JSON.stringify({ phone: `+91${loginDigits}` })
       });
       setLoginOtpSent(true);
-      setLoginPreviewOtp(res.devOtp || '');
       addToast(res.message || '6-digit OTP sent to +91' + loginDigits);
     } catch (err) {
       addToast(err.message || 'Could not send OTP');
@@ -124,7 +120,6 @@ export default function LoginPage() {
         body: JSON.stringify({ email: email.trim().toLowerCase() })
       });
       setEmailOtpSent(true);
-      setEmailPreviewOtp(res.devOtp || '');
       addToast(res.message || '6-digit email OTP sent!');
     } catch (err) {
       addToast(err.message || 'Could not send email OTP');
@@ -145,7 +140,6 @@ export default function LoginPage() {
         body: JSON.stringify({ phone: `+91${phoneDigits}` })
       });
       setOtpSent(true);
-      setSignupPreviewOtp(res.devOtp || '');
       addToast(res.message || '6-digit mobile OTP sent!');
     } catch (err) {
       addToast(err.message || 'Could not send mobile OTP');
@@ -348,11 +342,6 @@ export default function LoginPage() {
                     </button>
                   </div>
                 </div>
-                {loginPreviewOtp && (
-                  <div style={{ padding: '10px 12px', borderRadius: 12, background: 'var(--accent-gold-soft)', color: '#111827', fontSize: '0.82rem' }}>
-                    <strong>SMS Verification Code:</strong> <code>{loginPreviewOtp}</code> (valid 10m)
-                  </div>
-                )}
                 <div>
                   <label className="form-label">6-Digit Mobile OTP</label>
                   <input
@@ -417,11 +406,6 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
-            {emailPreviewOtp && (
-              <div style={{ padding: '10px 12px', borderRadius: 12, background: 'var(--accent-gold-soft)', color: '#111827', fontSize: '0.82rem' }}>
-                <strong>Email Verification Code:</strong> <code>{emailPreviewOtp}</code> (valid 10m)
-              </div>
-            )}
             <div>
               <label className="form-label">6-Digit Email OTP</label>
               <input
@@ -448,11 +432,6 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
-            {signupPreviewOtp && (
-              <div style={{ padding: '10px 12px', borderRadius: 12, background: 'var(--accent-gold-soft)', color: '#111827', fontSize: '0.82rem' }}>
-                <strong>SMS Verification Code:</strong> <code>{signupPreviewOtp}</code> (valid 10m)
-              </div>
-            )}
             <div>
               <label className="form-label">6-Digit Mobile OTP</label>
               <input

@@ -151,11 +151,9 @@ app.post('/api/auth/otp/send', async (req, res) => {
     res.json({
       success: true,
       phone,
-      simulated: Boolean(result.simulated),
-      ...(result.simulated && result.code ? { devOtp: result.code } : {}),
       expiresInSeconds: 600,
       message: result.simulated
-        ? `Verification OTP generated for ${phone}. Enter the 6-digit code to authenticate.`
+        ? 'Verification OTP generated. Check your SMS / server delivery channel.'
         : 'One-time verification code has been sent via SMS.'
     });
   } catch (err) {
@@ -257,7 +255,11 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
-// Sign In with email, username, OR Indian mobile number
+// Sign In with email, username, OR Indian mobile number (with brute-force lockout)
+const failedLoginAttempts = new Map();
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_MS = 15 * 60 * 1000;
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { identifier, password } = req.body;
@@ -270,9 +272,19 @@ app.post('/api/auth/login', async (req, res) => {
       searchIdent = normalizeIndianPhone(searchIdent) || searchIdent;
     }
 
+    const lockKey = searchIdent.toLowerCase();
+    const lockInfo = failedLoginAttempts.get(lockKey);
+    if (lockInfo && lockInfo.lockedUntil && Date.now() < lockInfo.lockedUntil) {
+      const minsLeft = Math.ceil((lockInfo.lockedUntil - Date.now()) / 60000);
+      return res.status(429).json({
+        error: 'ACCOUNT_TEMPORARILY_LOCKED',
+        message: `Too many failed sign-in attempts. Try again in ${minsLeft} minute(s) or use Mobile OTP.`
+      });
+    }
+
     const user = await db.findUserByIdentifier(searchIdent);
     if (!user) {
-      return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'No account found matching those credentials.' });
+      return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid credentials.' });
     }
 
     if (user.organizationBanned) {
@@ -284,8 +296,14 @@ app.post('/api/auth/login', async (req, res) => {
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid password.' });
+      const count = (lockInfo?.count || 0) + 1;
+      failedLoginAttempts.set(lockKey, {
+        count,
+        lockedUntil: count >= LOGIN_MAX_FAILS ? Date.now() + LOGIN_LOCK_MS : null
+      });
+      return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid credentials.' });
     }
+    failedLoginAttempts.delete(lockKey);
 
     const token = generateToken(user);
     setAuthCookie(res, token);
@@ -322,11 +340,9 @@ app.post('/api/auth/email-otp/send', async (req, res) => {
     res.json({
       success: true,
       email,
-      simulated: Boolean(result.simulated),
-      ...(result.simulated && result.code ? { devOtp: result.code } : {}),
       expiresInSeconds: 600,
       message: result.simulated
-        ? `Email verification OTP generated for ${email}. Enter the 6-digit code.`
+        ? 'Email verification OTP generated. Check your email inbox / server delivery channel.'
         : 'A 6-digit verification code has been sent to your email.'
     });
   } catch (err) {
@@ -976,8 +992,8 @@ app.get('/api/events/:id', async (req, res) => {
   }
 });
 
-// Get contact info for an event
-app.get('/api/events/:id/contact', async (req, res) => {
+// Get contact info for an event (Authenticated users & admins only — protects organizer PII)
+app.get('/api/events/:id/contact', authenticateRequired, async (req, res) => {
   try {
     const event = await db.getEventById(req.params.id);
     if (!event) return res.status(404).json({ error: 'EVENT_NOT_FOUND' });

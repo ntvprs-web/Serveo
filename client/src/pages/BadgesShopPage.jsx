@@ -20,7 +20,6 @@ export default function BadgesShopPage() {
   const [paymentReference, setPaymentReference] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [previewOtp, setPreviewOtp] = useState('');
   const [sendingOtp, setSendingOtp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -39,7 +38,6 @@ export default function BadgesShopPage() {
     setPaymentReference('');
     setOtpCode('');
     setOtpSent(false);
-    setPreviewOtp('');
     setCheckoutBadge({ key: cat.key, label: cat.label, price, emoji: cat.emoji });
   };
 
@@ -51,7 +49,6 @@ export default function BadgesShopPage() {
         body: JSON.stringify({ phone: buyerPhone })
       });
       setOtpSent(true);
-      setPreviewOtp(res.devOtp || '');
       addToast(res.message || '6-digit OTP sent to your mobile.');
     } catch (err) {
       addToast(err.message || 'Enter a valid +91 Indian mobile number.');
@@ -335,11 +332,6 @@ export default function BadgesShopPage() {
                   </button>
                 </div>
               </div>
-              {previewOtp && (
-                <div style={{ padding: '10px 12px', borderRadius: 12, background: 'var(--accent-gold-soft)', color: '#111827', fontSize: '0.82rem' }}>
-                  <strong>SMS Verification Code:</strong> <code>{previewOtp}</code> (valid 10m)
-                </div>
-              )}
               <div>
                 <label className="form-label">6-Digit Mobile OTP</label>
                 <input required maxLength={6} className="input-field" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="Enter 6-digit OTP" />
