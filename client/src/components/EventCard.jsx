@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Bookmark, Share2, Calendar, MapPin, CheckCircle2, Users, Award } from 'lucide-react';
+import { Bookmark, Share2, Calendar, MapPin, CheckCircle2, Users, Award, ShieldCheck } from 'lucide-react';
 import { getCategoryInfo, getOrganizerStarTier } from '../utils/constants';
 import { formatDateShort } from '../utils/api';
 import { useApp } from '../context/AppContext';
@@ -218,17 +218,17 @@ export default function EventCard({ event, variant = 'standard' }) {
           </span>
           {hasSpecialistBadge ? (
             <span
-              className="badge-pill"
+              className="specialist-seal-pill"
               style={{
-                background: cat.pastelBg,
+                background: `linear-gradient(135deg, ${cat.pastelBg} 0%, #FFFFFF 100%)`,
                 color: '#111827',
-                border: `1px solid ${cat.color}`,
-                padding: '2px 8px',
-                fontSize: '0.68rem'
+                border: `1px solid ${cat.color}`
               }}
               title={`Host holds the Verified ${cat.label} Specialist Badge`}
             >
-              <Award size={11} color={cat.color} /> Specialist
+              <Award size={12} color={cat.color} />
+              <span>Specialist</span>
+              <ShieldCheck size={11} color="#10B981" />
             </span>
           ) : starTier ? (
             <span

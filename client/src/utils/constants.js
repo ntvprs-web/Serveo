@@ -203,13 +203,88 @@ export const BADGE_OVERVIEW_BENEFITS = [
   }
 ];
 
+const BADGE_META = {
+  blood: {
+    sealName: 'Crimson Lifesaver Crest',
+    tierLabel: 'Most Popular',
+    tierTone: 'coral',
+    boostLabel: '2× Urgent Reach',
+    spotlightCopy: 'Verified Blood Drive Specialist seal + donor wave priority'
+  },
+  medical: {
+    sealName: 'Careline Clinical Crest',
+    tierLabel: 'Verified Host',
+    tierTone: 'sky',
+    boostLabel: '1.8× Local Reach',
+    spotlightCopy: 'Hospital-grade trust seal for checkups & diagnostic camps'
+  },
+  food: {
+    sealName: 'Zero-Hunger Patron Crest',
+    tierLabel: 'Community Pick',
+    tierTone: 'gold',
+    boostLabel: '1.8× Dispatch Boost',
+    spotlightCopy: 'Priority visibility for surplus meal & ration distribution'
+  },
+  disaster: {
+    sealName: 'Rapid Relief Vanguard',
+    tierLabel: 'High Impact',
+    tierTone: 'coral',
+    boostLabel: '2.5× Emergency Reach',
+    spotlightCopy: 'Top emergency dispatch ranking & crisis coordinator seal'
+  },
+  animal: {
+    sealName: 'Compassion Guardian Seal',
+    tierLabel: 'Specialist',
+    tierTone: 'lavender',
+    boostLabel: '1.6× Rescue Reach',
+    spotlightCopy: 'Verified shelter & vaccination drive credibility badge'
+  },
+  environment: {
+    sealName: 'Green Canopy Crest',
+    tierLabel: 'Eco Leader',
+    tierTone: 'mint',
+    boostLabel: '1.8× Clean-Up Reach',
+    spotlightCopy: 'Verified climate, plantation & beach clean-up steward seal'
+  },
+  education: {
+    sealName: 'Scholar Torch Crest',
+    tierLabel: 'Mentor Tier',
+    tierTone: 'sky',
+    boostLabel: '1.7× Campus Reach',
+    spotlightCopy: 'Youth literacy & mentorship host trust credential'
+  },
+  tech: {
+    sealName: 'Civic Digital Pioneer',
+    tierLabel: 'Pro Tier',
+    tierTone: 'lavender',
+    boostLabel: '1.7× Builder Reach',
+    spotlightCopy: 'Standout verified host seal for civic hackathons & workshops'
+  },
+  seminar: {
+    sealName: 'Keynote Steward Crest',
+    tierLabel: 'Elite Prestige',
+    tierTone: 'gold',
+    boostLabel: '2× Featured Slot',
+    spotlightCopy: 'Premium speaker & townhall organizer verification crest'
+  },
+  other: {
+    sealName: 'Civic Catalyst Crest',
+    tierLabel: 'Verified Host',
+    tierTone: 'gold',
+    boostLabel: '1.6× Local Reach',
+    spotlightCopy: 'Official verified seal for custom neighborhood initiatives'
+  }
+};
+
 export function getBadgeDetails(cat, index = 0) {
   const price = 49 + index * 10;
+  const meta = BADGE_META[cat.key] || BADGE_META.other;
   return {
     price,
+    ...meta,
     perks: [
-      `Priority Boost on ${cat.label} listings`,
-      `Verified ${cat.label} Specialist seal on Event Cards`,
+      `${meta.boostLabel} on ${cat.label} listings`,
+      `Live "${meta.sealName}" on Event Cards`,
       '+25% Civic Standing bonus & Roster priority'
     ]
   };

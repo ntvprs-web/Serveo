@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Award, Clock, Download, ShoppingBag, CheckCircle2, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Award, Clock, Download, ShoppingBag, CheckCircle2, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiFetch } from '../utils/api';
 import { CATEGORIES, getBadgeDetails, VOLUNTEER_FREE_BADGES } from '../utils/constants';
+import BadgeMedallion from '../components/BadgeMedallion';
+import OrganizerBadgeCard from '../components/OrganizerBadgeCard';
 
 const DEFAULT_SESSIONS = [
   {
@@ -57,7 +59,8 @@ const DEFAULT_SESSIONS = [
 ];
 
 export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
-  const { user, ownedBadges, equippedBadges, buyBadge, toggleEquipBadge } = useApp();
+  const { user, ownedBadges, equippedBadges, toggleEquipBadge } = useApp();
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState(DEFAULT_SESSIONS);
   const [totalHours, setTotalHours] = useState(28.5);
   const [bloodDonationsCount, setBloodDonationsCount] = useState(0);
@@ -219,24 +222,33 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
           {unlockedFreeBadges.map((b) => (
             <div
               key={b.id}
+              className="badge-shop-card"
               style={{
                 padding: 16,
-                borderRadius: 18,
-                background: 'var(--bg-surface-muted)',
-                border: b.earned ? `2px solid ${b.color}` : '1px dashed var(--border-subtle)',
-                opacity: b.earned ? 1 : 0.72,
+                borderRadius: 20,
+                background: b.earned
+                  ? `linear-gradient(135deg, ${b.color}18 0%, var(--bg-surface) 70%)`
+                  : 'var(--bg-surface-muted)',
+                border: b.earned ? `2px solid ${b.color}` : '1px dashed var(--border-strong)',
+                opacity: b.earned ? 1 : 0.78,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 8
+                gap: 10
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 14, background: b.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
-                    {b.emoji}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{b.title}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                  <BadgeMedallion
+                    badgeKey={b.id}
+                    color={b.color}
+                    pastelBg={b.bg}
+                    size={54}
+                    locked={!b.earned}
+                    verified={b.earned}
+                    animated={b.earned}
+                  />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.96rem' }}>{b.title}</div>
                     <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{b.subtitle}</div>
                   </div>
                 </div>
@@ -245,7 +257,8 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
                   style={{
                     background: b.earned ? '#D1FAE5' : 'var(--bg-surface)',
                     color: b.earned ? '#065F46' : 'var(--text-muted)',
-                    fontSize: '0.7rem'
+                    fontSize: '0.7rem',
+                    flexShrink: 0
                   }}
                 >
                   {b.earned ? '✓ Earned (Free)' : 'Locked'}
@@ -277,57 +290,20 @@ export default function MyHoursAndBadgesPage({ mode = 'hours' }) {
 
         <div className="grid-responsive-3">
           {Object.values(CATEGORIES).map((cat, index) => {
-            const { price, perks } = getBadgeDetails(cat, index);
+            const details = getBadgeDetails(cat, index);
             const isOwned = ownedBadges.includes(cat.key);
             const isEquipped = equippedBadges.includes(cat.key);
             return (
-              <div
+              <OrganizerBadgeCard
                 key={cat.key}
-                style={{
-                  padding: 16,
-                  borderRadius: 18,
-                  background: 'var(--bg-surface-muted)',
-                  border: isOwned ? `2px solid ${cat.color}` : '1px solid var(--border-subtle)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 14, background: cat.pastelBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                    {cat.emoji}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{cat.label}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>₹{price} · Cause Badge</div>
-                  </div>
-                </div>
-                <ul style={{ margin: 0, paddingLeft: 16, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                  {perks.map((p) => (
-                    <li key={p}>{p}</li>
-                  ))}
-                </ul>
-                {isOwned ? (
-                  <button
-                    type="button"
-                    onClick={() => toggleEquipBadge(cat.key)}
-                    className={`pill-btn ${isEquipped ? '' : 'pill-btn-dark'}`}
-                    style={{ width: '100%', marginTop: 'auto' }}
-                  >
-                    {isEquipped ? <EyeOff size={14} /> : <Eye size={14} />}
-                    <span>{isEquipped ? 'Equipped (Hide)' : 'Equip on Cards'}</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => buyBadge(cat.key, cat.label, price)}
-                    className="pill-btn pill-btn-dark"
-                    style={{ width: '100%', marginTop: 'auto' }}
-                  >
-                    {`Unlock Badge (₹${price})`}
-                  </button>
-                )}
-              </div>
+                cat={cat}
+                details={details}
+                isOwned={isOwned}
+                isEquipped={isEquipped}
+                onToggleEquip={toggleEquipBadge}
+                onPurchase={() => navigate('/badges')}
+                compactActionLabel={`Unlock Seal · ₹${details.price}`}
+              />
             );
           })}
         </div>

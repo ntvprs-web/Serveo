@@ -637,3 +637,99 @@ img {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ==========================================================================
+   Collectible Badges & Seals UI
+   ========================================================================== */
+.badge-shop-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--bg-surface);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.badge-shop-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.badge-crest {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.badge-shop-card:hover .badge-crest-animated,
+.badge-crest-animated:hover {
+  transform: scale(1.06) rotate(-3deg);
+}
+
+.badge-crest-sheen {
+  position: absolute;
+  inset: 14%;
+  border-radius: 50%;
+  background: linear-gradient(125deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0) 48%, rgba(255, 255, 255, 0.28) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.badge-buy-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: var(--radius-pill);
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+  transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
+}
+
+.badge-buy-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.2);
+}
+
+.badge-buy-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.55s ease;
+}
+
+.badge-shop-card:hover .badge-buy-btn::after,
+.badge-buy-btn:hover::after {
+  left: 135%;
+}
+
+.specialist-seal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-shop-card,
+  .badge-crest,
+  .badge-buy-btn,
+  .badge-buy-btn::after {
+    transition: none;
+  }
+}
