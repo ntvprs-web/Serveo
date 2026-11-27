@@ -428,37 +428,17 @@ export default function AppShell({ children }) {
           </div>
         )}
 
-        <header
-          style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 20,
-            background: 'var(--bg-glass)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            borderBottom: '1px solid var(--border-subtle)'
-          }}
-        >
-          <div
-            className="app-container"
-            style={{
-              paddingTop: 12,
-              paddingBottom: 12,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+        <header className="app-header">
+          <div className="app-container app-header-inner">
+            <div className="app-header-left">
               <button
                 type="button"
                 onClick={() => setMobileDrawerOpen(true)}
                 aria-label="Open navigation menu"
                 className="mobile-menu-trigger"
                 style={{
-                  width: 40,
-                  height: 40,
+                  width: 38,
+                  height: 38,
                   borderRadius: '50%',
                   border: '1px solid var(--border-subtle)',
                   background: 'var(--bg-surface)',
@@ -469,7 +449,7 @@ export default function AppShell({ children }) {
                   flexShrink: 0
                 }}
               >
-                <Menu size={19} />
+                <Menu size={18} />
               </button>
 
               <Link to="/" aria-label="SERVEO Home" style={{ flexShrink: 0 }}>
@@ -477,9 +457,9 @@ export default function AppShell({ children }) {
                   src="/images/serveo-logo.jpg"
                   alt="SERVEO"
                   style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 12,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 11,
                     objectFit: 'cover',
                     border: '1px solid var(--border-subtle)',
                     boxShadow: 'var(--shadow-xs)'
@@ -487,22 +467,22 @@ export default function AppShell({ children }) {
                 />
               </Link>
 
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+              <div className="app-header-brand">
+                <div className="app-header-greeting">
                   {getGreeting()} · Alert Range: 0–{alertRadiusKm} km {isPremium ? '✨' : ''}
                 </div>
-                <div style={{ fontSize: '1.12rem', fontWeight: 700, lineHeight: 1.15 }}>
+                <div className="app-header-title">
                   {user ? (
                     <>
                       {user.name.split(' ')[0]}{' '}
-                      <span className="serif-italic" style={{ fontSize: '1.25rem', fontWeight: 400 }}>
+                      <span className="serif-italic" style={{ fontSize: '1.15em', fontWeight: 400 }}>
                         {user.name.split(' ').slice(1).join(' ') || 'Welcome'}
                       </span>
                     </>
                   ) : (
                     <>
                       SERVEO{' '}
-                      <span className="serif-italic" style={{ fontSize: '1.25rem', fontWeight: 400 }}>
+                      <span className="serif-italic" style={{ fontSize: '1.15em', fontWeight: 400 }}>
                         Community
                       </span>
                     </>
@@ -511,19 +491,18 @@ export default function AppShell({ children }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+            <div className="app-header-actions">
               <button
                 type="button"
                 onClick={detectLocation}
-                className="pill-btn"
-                style={{ padding: '7px 12px', fontSize: '0.8rem' }}
+                className="pill-btn header-location-btn"
               >
-                <MapPin size={14} color="#F97352" />
-                <span>{userLocation ? userLocation.label : 'Detect City'}</span>
+                <MapPin size={14} color="#F97352" style={{ flexShrink: 0 }} />
+                <span className="header-location-label">{userLocation ? userLocation.label : 'Detect City'}</span>
               </button>
 
               {!isPremium && (
-                <Link to="/premium" className="pill-btn pill-btn-gold" style={{ padding: '7px 12px', fontSize: '0.78rem' }}>
+                <Link to="/premium" className="pill-btn pill-btn-gold header-premium-btn">
                   <Crown size={14} /> 25 km+
                 </Link>
               )}
@@ -533,8 +512,8 @@ export default function AppShell({ children }) {
                 onClick={() => setNotifOpen(v => !v)}
                 aria-label="Emergency & Proximity Notifications"
                 style={{
-                  width: 40,
-                  height: 40,
+                  width: 38,
+                  height: 38,
                   borderRadius: '50%',
                   border: '1px solid var(--border-subtle)',
                   background: 'var(--bg-surface)',
@@ -542,10 +521,11 @@ export default function AppShell({ children }) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  position: 'relative'
+                  position: 'relative',
+                  flexShrink: 0
                 }}
               >
-                <Bell size={18} />
+                <Bell size={17} />
                 <span
                   style={{
                     position: 'absolute',
@@ -564,10 +544,10 @@ export default function AppShell({ children }) {
                   className="card"
                   style={{
                     position: 'absolute',
-                    top: 48,
+                    top: 46,
                     right: 0,
                     width: 320,
-                    maxWidth: '90vw',
+                    maxWidth: 'calc(100vw - 28px)',
                     padding: 14,
                     zIndex: 60
                   }}

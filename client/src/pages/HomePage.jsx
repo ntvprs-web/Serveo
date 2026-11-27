@@ -94,28 +94,30 @@ export default function HomePage() {
           background: 'linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface-muted) 100%)'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, maxWidth: 620 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, maxWidth: 620, minWidth: 0, flex: '1 1 260px' }}>
           <img
             src="/images/serveo-logo.jpg"
             alt="SERVEO Icon"
             style={{
-              width: 64,
-              height: 64,
-              borderRadius: 18,
+              width: 56,
+              height: 56,
+              borderRadius: 16,
               objectFit: 'cover',
               boxShadow: 'var(--shadow-md)',
               flexShrink: 0
             }}
           />
-          <div>
-            <span className="badge-pill" style={{ background: 'var(--accent-gold-soft)', color: '#111827', marginBottom: 6 }}>
-              <Sparkles size={13} />{' '}
-              {userLocation
-                ? `${nearbyCount} events within 5 km of you`
-                : `${events.length} live public-service events across India`}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span className="badge-pill" style={{ background: 'var(--accent-gold-soft)', color: '#111827', marginBottom: 6, maxWidth: '100%' }}>
+              <Sparkles size={13} style={{ flexShrink: 0 }} />{' '}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {userLocation
+                  ? `${nearbyCount} events within 5 km of you`
+                  : `${events.length} live public-service events across India`}
+              </span>
             </span>
-            <h1 style={{ margin: '0 0 6px', fontSize: '1.55rem', fontWeight: 800, lineHeight: 1.2 }}>
-              Discover Nearby Drives & <span className="serif-italic" style={{ fontSize: '1.75rem' }}>Host Social Events</span>
+            <h1 style={{ margin: '0 0 6px', fontSize: 'clamp(1.22rem, 3.8vw, 1.55rem)', fontWeight: 800, lineHeight: 1.2 }}>
+              Discover Nearby Drives & <span className="serif-italic" style={{ fontSize: 'clamp(1.35rem, 4.2vw, 1.75rem)' }}>Host Social Events</span>
             </h1>
             <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
               Find volunteer opportunities around you or launch a public-service event at any destination with real-time alerts.
@@ -264,7 +266,7 @@ export default function HomePage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(138px, 100%), 1fr))',
             gap: 12
           }}
         >
@@ -350,6 +352,9 @@ export default function HomePage() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 12,
+                    width: '100%',
+                    minWidth: 0,
+                    overflow: 'hidden',
                     padding: '10px 12px',
                     borderRadius: 16,
                     background: idx === 1 ? 'var(--bg-surface-muted)' : 'transparent',
@@ -383,7 +388,7 @@ export default function HomePage() {
                     >
                       {ev.title}
                     </div>
-                    <div style={{ display: 'flex', gap: 10, fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <Calendar size={12} /> {formatDateShort(ev.date)}
                       </span>
@@ -392,7 +397,7 @@ export default function HomePage() {
                       </span>
                     </div>
                   </div>
-                  <ArrowRight size={16} color="var(--text-muted)" />
+                  <ArrowRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
                 </Link>
               ))
             )}
@@ -401,9 +406,9 @@ export default function HomePage() {
 
         {/* Right: Popular Communities & Verified Organizers */}
         <div className="card" style={{ padding: 18 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
             <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Popular Communities</h3>
-            <Link to="/organizer" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+            <Link to="/organizer" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
               Organizer Portal
             </Link>
           </div>
@@ -428,16 +433,18 @@ export default function HomePage() {
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  gap: 10
+                  gap: 10,
+                  minWidth: 0,
+                  width: '100%'
                 }}
               >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{org.organizer}</span>
-                    {org.verified && <CheckCircle2 size={14} color="#10B981" />}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, minWidth: 0 }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.88rem', overflowWrap: 'anywhere' }}>{org.organizer}</span>
+                    {org.verified && <CheckCircle2 size={14} color="#10B981" style={{ flexShrink: 0 }} />}
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Users size={13} /> {org.totalVolunteers || 100}+ volunteers · {org.eventCount || 1} drives
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                    <Users size={13} style={{ flexShrink: 0 }} /> {org.totalVolunteers || 100}+ volunteers · {org.eventCount || 1} drives
                   </div>
                 </div>
                 <Link

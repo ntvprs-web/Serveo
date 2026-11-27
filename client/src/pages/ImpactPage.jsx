@@ -124,12 +124,12 @@ export default function ImpactPage() {
             const count = m.eventsHeld ?? m.events ?? 0;
             const vols = m.volunteersMobilized ?? m.volunteers ?? 0;
             return (
-              <div key={m.month} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ width: 76, fontSize: '0.82rem', fontWeight: 600 }}>{m.month}</span>
-                <div style={{ flex: 1, height: 12, borderRadius: 99, background: 'var(--bg-surface-muted)', overflow: 'hidden' }}>
+              <div key={m.month} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <span style={{ width: 68, fontSize: '0.82rem', fontWeight: 600, flexShrink: 0 }}>{m.month}</span>
+                <div style={{ flex: '1 1 120px', minWidth: 80, height: 12, borderRadius: 99, background: 'var(--bg-surface-muted)', overflow: 'hidden' }}>
                   <div style={{ width: `${Math.min(100, Math.max(8, (count / 700) * 100))}%`, height: '100%', background: 'var(--accent-coral)' }} />
                 </div>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, minWidth: 130, textAlign: 'right' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>
                   {count} drives · {Number(vols).toLocaleString('en-IN')} vols
                 </span>
               </div>

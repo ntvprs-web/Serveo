@@ -192,7 +192,7 @@ export default function MapPage() {
             {mapError}
           </div>
         ) : (
-          <div ref={mapContainerRef} style={{ width: '100%', height: '62vh', minHeight: 420 }} />
+          <div ref={mapContainerRef} style={{ width: '100%', height: 'clamp(280px, 58dvh, 640px)' }} />
         )}
 
         {selectedEvent && (
