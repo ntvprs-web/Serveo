@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { Resend } = require('resend');
 
 // JWT secret must be set in environment - no fallback for security
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -12,8 +13,12 @@ const COOKIE_NAME = 'serveo_token';
 // In-memory OTP stores for real 6-digit phone & email OTP verification
 const otpStore = new Map();
 const emailOtpStore = new Map();
+// Track pre-verified emails/phones so signup can skip re-verification
+const verifiedEmails = new Map(); // email -> expiresAt
+const verifiedPhones = new Map(); // phone -> expiresAt
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
+const VERIFIED_TTL_MS = 15 * 60 * 1000; // pre-verified flag valid for 15 min
 
 function hashOtp(key, code) {
   return crypto.createHash('sha256').update(`${String(key).toLowerCase()}:${String(code).trim()}`).digest('hex');
@@ -122,7 +127,11 @@ async function verifyTwilioOtp(phone, code) {
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
   if (!accountSid || !authToken || !serviceSid) {
-    return checkOtp(otpStore, phone, code, 'SMS');
+    const result = checkOtp(otpStore, phone, code, 'SMS');
+    if (result.approved) {
+      verifiedPhones.set(phone, Date.now() + VERIFIED_TTL_MS);
+    }
+    return result;
   }
 
   const url = `https://verify.twilio.com/v2/Services/${serviceSid}/VerificationCheck`;
@@ -143,6 +152,7 @@ async function verifyTwilioOtp(phone, code) {
     return { approved: false, message: data.message || 'Incorrect verification code.' };
   }
 
+  verifiedPhones.set(phone, Date.now() + VERIFIED_TTL_MS);
   return { approved: true, status: data.status };
 }
 
@@ -224,45 +234,78 @@ async function sendEmailOtp(email) {
   const code = issueOtp(emailOtpStore, cleanEmail, 'EMAIL');
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
+    const resend = new Resend(resendKey);
     const html = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 28px; background: #f8fafc; border-radius: 16px;">
-        <div style="background: #ffffff; padding: 28px; border-radius: 14px; border: 1px solid #e2e8f0;">
-          <div style="font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 6px;">SERVEO Community</div>
-          <p style="font-size: 14px; color: #475569; margin: 0 0 20px;">Use the 6-digit verification code below to verify your email address on SERVEO:</p>
-          <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 16px; text-align: center; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #111827; margin-bottom: 20px;">
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 28px 18px; background: #f8fafc;">
+        <div style="background: #ffffff; padding: 32px 28px; border-radius: 18px; border: 1px solid #e2e8f0; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
+          <div style="display: inline-block; padding: 6px 12px; border-radius: 999px; background: #111827; color: #facc15; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;">
+            SERVEO Community Verification
+          </div>
+          <h1 style="font-size: 22px; line-height: 1.3; font-weight: 800; color: #0f172a; margin: 0 0 10px;">
+            Verify your email address
+          </h1>
+          <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 22px;">
+            Enter this 6-digit one-time verification code in SERVEO to verify <strong>${cleanEmail}</strong>:
+          </p>
+          <div style="background: #fffbeb; border: 2px solid #f59e0b; border-radius: 14px; padding: 18px 14px; text-align: center; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 34px; font-weight: 800; letter-spacing: 10px; color: #111827; margin-bottom: 22px;">
             ${code}
           </div>
-          <p style="font-size: 13px; color: #64748b; margin: 0 0 8px;">This code expires in <strong>10 minutes</strong>. Never share it with anyone.</p>
-          <p style="font-size: 12px; color: #94a3b8; margin: 0;">If you did not request this code, you can safely ignore this email.</p>
+          <p style="font-size: 13px; line-height: 1.5; color: #475569; margin: 0 0 10px;">
+            This code is valid for <strong>10 minutes</strong> and can only be used once.
+          </p>
+          <p style="font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; padding-top: 14px; border-top: 1px solid #f1f5f9;">
+            For your security, never share this OTP with anyone. If you did not request verification on SERVEO, you can safely ignore this email.
+          </p>
         </div>
       </div>
     `;
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'SERVEO Community <onboarding@resend.dev>',
-        to: [cleanEmail],
-        subject: `${code} is your SERVEO verification code`,
-        html,
-        text: `Your SERVEO 6-digit email verification code is ${code}. Valid for 10 minutes.`
-      })
+
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'SERVEO Community <onboarding@resend.dev>',
+      to: [cleanEmail],
+      subject: `${code} is your SERVEO verification code`,
+      html,
+      text: `Your SERVEO 6-digit email verification code is ${code}. It expires in 10 minutes.`
     });
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.message || 'Could not send verification email.');
+
+    if (error) {
+      throw new Error(error.message || 'Could not send verification email via Resend.');
     }
-    return { success: true, simulated: false };
+    return { success: true, simulated: false, id: data?.id || null };
   }
   return { success: true, simulated: true, code };
 }
 
 async function verifyEmailOtp(email, code) {
   const cleanEmail = String(email || '').trim().toLowerCase();
-  return checkOtp(emailOtpStore, cleanEmail, code, 'Email');
+  const result = checkOtp(emailOtpStore, cleanEmail, code, 'Email');
+  if (result.approved) {
+    verifiedEmails.set(cleanEmail, Date.now() + VERIFIED_TTL_MS);
+  }
+  return result;
+}
+
+function isEmailPreVerified(email) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const exp = verifiedEmails.get(cleanEmail);
+  if (!exp) return false;
+  if (Date.now() > exp) { verifiedEmails.delete(cleanEmail); return false; }
+  return true;
+}
+
+function consumeEmailVerification(email) {
+  verifiedEmails.delete(String(email || '').trim().toLowerCase());
+}
+
+function isPhonePreVerified(phone) {
+  const exp = verifiedPhones.get(phone);
+  if (!exp) return false;
+  if (Date.now() > exp) { verifiedPhones.delete(phone); return false; }
+  return true;
+}
+
+function consumePhoneVerification(phone) {
+  verifiedPhones.delete(phone);
 }
 
 module.exports = {
@@ -273,6 +316,10 @@ module.exports = {
   verifyTwilioOtp,
   sendEmailOtp,
   verifyEmailOtp,
+  isEmailPreVerified,
+  consumeEmailVerification,
+  isPhonePreVerified,
+  consumePhoneVerification,
   generateToken,
   setAuthCookie,
   clearAuthCookie,

@@ -22,6 +22,10 @@ const {
   verifyTwilioOtp,
   sendEmailOtp,
   verifyEmailOtp,
+  isEmailPreVerified,
+  consumeEmailVerification,
+  isPhonePreVerified,
+  consumePhoneVerification,
   generateToken,
   setAuthCookie,
   clearAuthCookie,
@@ -173,12 +177,27 @@ app.post('/api/auth/otp/send', async (req, res) => {
 // Step 2: Verify Phone OTP + Email OTP and create user account
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    const { name, username, email, phone: rawPhone, code, emailCode, password, notificationLat, notificationLng, bloodGroup } = req.body;
+    const {
+      name,
+      username,
+      email: rawEmail,
+      phone: rawPhone,
+      code,
+      emailCode,
+      password,
+      notificationLat,
+      notificationLng,
+      bloodGroup,
+      role = 'volunteer',
+      organizationType
+    } = req.body;
 
-    if (!name || !username || !email || !rawPhone || !password) {
+    if (!name || !username || !rawEmail || !rawPhone || !password) {
       return res.status(400).json({ error: 'MISSING_FIELDS', message: 'All fields are required.' });
     }
 
+    const email = String(rawEmail).trim().toLowerCase();
+    const cleanUsername = String(username).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
     const phone = normalizeIndianPhone(rawPhone);
     if (!phone || !isValidIndianPhone(phone)) {
       return res.status(400).json({ error: 'INVALID_PHONE', message: 'A valid 10-digit Indian mobile number starting with 6-9 is required.' });
@@ -192,42 +211,55 @@ app.post('/api/auth/signup', async (req, res) => {
       return res.status(400).json({ error: 'WEAK_PASSWORD', message: 'Password must be at least 6 characters.' });
     }
 
-    // Verify Mobile OTP
-    if (!code) {
-      return res.status(400).json({ error: 'MISSING_OTP', message: '6-digit mobile verification OTP is required.' });
-    }
-    const otpCheck = await verifyTwilioOtp(phone, String(code).trim());
-    if (!otpCheck.approved) {
-      return res.status(400).json({ error: 'INVALID_OTP', message: otpCheck.message || 'Invalid or expired mobile OTP code.' });
+    // Verify Mobile OTP (or accept pre-verified from /api/auth/otp/verify)
+    if (isPhonePreVerified(phone)) {
+      consumePhoneVerification(phone);
+    } else {
+      if (!code) {
+        return res.status(400).json({ error: 'MISSING_OTP', message: '6-digit mobile verification OTP is required.' });
+      }
+      const otpCheck = await verifyTwilioOtp(phone, String(code).trim());
+      if (!otpCheck.approved) {
+        return res.status(400).json({ error: 'INVALID_OTP', message: otpCheck.message || 'Invalid or expired mobile OTP code.' });
+      }
     }
 
-    // Verify Email OTP
-    if (!emailCode) {
-      return res.status(400).json({ error: 'MISSING_EMAIL_OTP', message: '6-digit email verification OTP is required.' });
-    }
-    const emailOtpCheck = await verifyEmailOtp(email, String(emailCode).trim());
-    if (!emailOtpCheck.approved) {
-      return res.status(400).json({ error: 'INVALID_EMAIL_OTP', message: emailOtpCheck.message || 'Invalid or expired email OTP code.' });
+    // Verify Email OTP (or accept pre-verified from /api/auth/email-otp/verify)
+    if (isEmailPreVerified(email)) {
+      consumeEmailVerification(email);
+    } else {
+      if (!emailCode) {
+        return res.status(400).json({ error: 'MISSING_EMAIL_OTP', message: '6-digit email verification OTP is required.' });
+      }
+      const emailOtpCheck = await verifyEmailOtp(email, String(emailCode).trim());
+      if (!emailOtpCheck.approved) {
+        return res.status(400).json({ error: 'INVALID_EMAIL_OTP', message: emailOtpCheck.message || 'Invalid or expired email OTP code.' });
+      }
     }
 
     // Check unique constraints
     const existing = await db.findUserByIdentifier(email) || 
-                     await db.findUserByIdentifier(username) || 
+                     await db.findUserByIdentifier(cleanUsername) || 
                      await db.findUserByIdentifier(phone);
     if (existing) {
       return res.status(409).json({ error: 'USER_EXISTS', message: 'An account with this email, username, or phone already exists.' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const resolvedOrgType = role === 'organizer'
+      ? (['organizer', 'ngo', 'hospital', 'blood_bank', 'restaurant', 'orphanage'].includes(organizationType) ? organizationType : 'organizer')
+      : null;
+
     const user = await db.createUser({
-      name,
-      username,
+      name: String(name).trim(),
+      username: cleanUsername,
       email,
       phone,
       passwordHash,
       notificationLat,
       notificationLng,
-      bloodGroup: bloodGroup || null
+      bloodGroup: resolvedOrgType ? null : (bloodGroup || null),
+      organizationType: resolvedOrgType
     });
 
     const token = generateToken(user);
@@ -240,6 +272,8 @@ app.post('/api/auth/signup', async (req, res) => {
       email: user.email,
       phone: user.phone,
       bloodGroup: user.bloodGroup || null,
+      organizationType: user.organizationType || null,
+      role: user.organizationType ? 'organizer' : 'volunteer',
       isAdmin: user.isAdmin,
       organizationBanned: user.organizationBanned
     };
@@ -351,6 +385,27 @@ app.post('/api/auth/email-otp/send', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'EMAIL_OTP_FAILED', message: err.message });
+  }
+});
+
+// Step 1c: Verify Email OTP code (Resend / in-memory)
+app.post('/api/auth/email-otp/verify', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const code = String(req.body?.code || '').trim();
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: 'INVALID_EMAIL', message: 'Please provide a valid email address.' });
+    }
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ error: 'INVALID_OTP', message: 'Enter the 6-digit email verification code.' });
+    }
+    const check = await verifyEmailOtp(email, code);
+    if (!check.approved) {
+      return res.status(400).json({ error: 'INVALID_OTP', message: check.message || 'Invalid or expired email OTP.' });
+    }
+    res.json({ success: true, verified: true, email });
+  } catch (err) {
+    res.status(500).json({ error: 'EMAIL_OTP_VERIFY_FAILED', message: err.message });
   }
 });
 

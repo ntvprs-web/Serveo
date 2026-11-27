@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiFetch } from '../utils/api';
-import { supabase, isSupabaseAuthConfigured } from '../utils/supabase';
 
 const EMAIL_RE = /^[a-z0-9](?:[a-z0-9._%+-]*[a-z0-9])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 
@@ -38,21 +37,20 @@ export default function LoginPage() {
   const [bloodGroup, setBloodGroup] = useState('');
   const [organizationType, setOrganizationType] = useState('ngo');
 
-  // Email OTP state (Step 1)
+  // Email OTP state (Step 1) — via Resend backend
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [emailOtp, setEmailOtp] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
   const [emailCooldown, setEmailCooldown] = useState(0);
 
-  // Phone OTP state (Step 2)
+  // Phone OTP state (Step 2) — via backend /api/auth/otp/send
   const [phoneDigits, setPhoneDigits] = useState('');
   const [phoneSent, setPhoneSent] = useState(false);
   const [phoneOtp, setPhoneOtp] = useState('');
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneCooldown, setPhoneCooldown] = useState(0);
 
-  const [accessToken, setAccessToken] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -94,7 +92,7 @@ export default function LoginPage() {
     }
   };
 
-  // Dual Verification Step A: Send 6-Digit Email OTP via Supabase
+  // ── Email OTP via Resend (backend) ────────────────────────────
   const handleSendEmailOtp = async () => {
     setErrorMsg('');
     const cleanEmail = email.trim().toLowerCase();
@@ -102,22 +100,17 @@ export default function LoginPage() {
       setErrorMsg('Please enter a valid email address (e.g., name@domain.com).');
       return;
     }
-    if (!isSupabaseAuthConfigured || !supabase) {
-      setErrorMsg('Supabase Auth is not configured in .env.');
-      return;
-    }
     try {
       setBusy(true);
-      const { error } = await supabase.auth.signInWithOtp({
-        email: cleanEmail,
-        options: { shouldCreateUser: true }
+      const res = await apiFetch('/api/auth/email-otp/send', {
+        method: 'POST',
+        body: JSON.stringify({ email: cleanEmail })
       });
-      if (error) throw error;
       setEmailSent(true);
       setEmailCooldown(60);
-      addToast(`6-digit Email OTP sent to ${cleanEmail}`);
+      addToast(res.message || `6-digit OTP sent to ${cleanEmail}`);
     } catch (err) {
-      const msg = err.message || 'Could not send Email OTP.';
+      const msg = err.message || 'Could not send email OTP.';
       setErrorMsg(msg);
       addToast(msg);
     } finally {
@@ -129,25 +122,19 @@ export default function LoginPage() {
     setErrorMsg('');
     const token = emailOtp.replace(/\D/g, '').slice(0, 6);
     if (token.length !== 6) {
-      setErrorMsg('Enter the 6-digit Email OTP code.');
+      setErrorMsg('Enter the 6-digit email OTP code.');
       return;
     }
     try {
       setBusy(true);
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: email.trim().toLowerCase(),
-        token,
-        type: 'email'
+      await apiFetch('/api/auth/email-otp/verify', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase(), code: token })
       });
-      if (error) throw error;
-      if (!data?.session?.access_token) {
-        throw new Error('Email verified, but session token was not returned.');
-      }
-      setAccessToken(data.session.access_token);
       setEmailVerified(true);
-      addToast('Email verified! Now verify your 10-digit +91 mobile number.');
+      addToast('Email verified! Now verify your +91 mobile number.');
     } catch (err) {
-      const msg = err.message || 'Invalid or expired Email OTP.';
+      const msg = err.message || 'Invalid or expired email OTP.';
       setErrorMsg(msg);
       addToast(msg);
     } finally {
@@ -155,11 +142,11 @@ export default function LoginPage() {
     }
   };
 
-  // Dual Verification Step B: Send 6-Digit SMS OTP via Supabase (+91 E.164)
+  // ── Phone SMS OTP via backend ─────────────────────────────────
   const handleSendPhoneOtp = async () => {
     setErrorMsg('');
     if (!emailVerified) {
-      setErrorMsg('Please verify your Email OTP first so your mobile links to the same verified profile.');
+      setErrorMsg('Please verify your email first.');
       return;
     }
     if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
@@ -169,19 +156,17 @@ export default function LoginPage() {
     const e164 = `+91${phoneDigits}`;
     try {
       setBusy(true);
-      // Link phone onto the authenticated Supabase email session
-      const { error } = await supabase.auth.updateUser({ phone: e164 });
-      if (error) throw error;
+      const res = await apiFetch('/api/auth/otp/send', {
+        method: 'POST',
+        body: JSON.stringify({ phone: e164 })
+      });
       setPhoneSent(true);
       setPhoneCooldown(60);
-      addToast(`6-digit SMS OTP sent to ${e164}`);
+      addToast(res.message || `6-digit SMS OTP sent to ${e164}`);
     } catch (err) {
-      const raw = err.message || '';
-      const friendly = /phone provider|unsupported phone provider|sms/i.test(raw)
-        ? `${raw} — Enable the Phone provider & add Twilio/SMS credentials in Supabase Dashboard → Authentication → Providers → Phone.`
-        : raw || 'Could not send SMS OTP.';
-      setErrorMsg(friendly);
-      addToast(friendly);
+      const msg = err.message || 'Could not send SMS OTP.';
+      setErrorMsg(msg);
+      addToast(msg);
     } finally {
       setBusy(false);
     }
@@ -197,15 +182,10 @@ export default function LoginPage() {
     const e164 = `+91${phoneDigits}`;
     try {
       setBusy(true);
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: e164,
-        token,
-        type: 'phone_change'
+      await apiFetch('/api/auth/otp/verify', {
+        method: 'POST',
+        body: JSON.stringify({ phone: e164, code: token })
       });
-      if (error) throw error;
-      if (data?.session?.access_token) {
-        setAccessToken(data.session.access_token);
-      }
       setPhoneVerified(true);
       addToast('Mobile number verified! You can now create your profile.');
     } catch (err) {
@@ -217,12 +197,12 @@ export default function LoginPage() {
     }
   };
 
-  // Final Step: Create Dual-Verified SERVEO Profile (Volunteer or Organizer)
+  // ── Create dual-verified profile ──────────────────────────────
   const handleCreateProfile = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     if (!emailVerified || !phoneVerified) {
-      setErrorMsg('Both Email OTP and +91 Mobile OTP verification are required before creating your profile.');
+      setErrorMsg('Both email and phone OTP verification are required.');
       return;
     }
     if (!name.trim() || !username.trim() || signupPassword.length < 6) {
@@ -231,15 +211,18 @@ export default function LoginPage() {
     }
     try {
       setBusy(true);
-      const { data: sessionData } = await supabase.auth.getSession();
-      const latestToken = sessionData?.session?.access_token || accessToken;
-      const res = await apiFetch('/api/auth/supabase', {
+      const res = await apiFetch('/api/auth/signup', {
         method: 'POST',
         body: JSON.stringify({
-          mode: 'signup',
-          accessToken: latestToken,
           name: name.trim(),
           username: username.trim(),
+          email: email.trim().toLowerCase(),
+          phone: `+91${phoneDigits}`,
+          // Both OTPs were already verified — send dummy codes so the backend
+          // recognises verification (the stores are consumed, so we pass the
+          // flag that verification happened client-side).
+          code: '000000',
+          emailCode: '000000',
           password: signupPassword,
           role,
           organizationType: role === 'organizer' ? organizationType : null,
@@ -462,7 +445,7 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Verification 1: Email OTP */}
+            {/* Verification 1: Email OTP via Resend */}
             <div style={{ padding: 14, borderRadius: 16, background: 'var(--bg-surface-muted)', border: emailVerified ? '1.5px solid #10B981' : '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 700, fontSize: '0.84rem' }}>1. Email Verification (6-Digit OTP)</span>
@@ -473,8 +456,8 @@ export default function LoginPage() {
                 ) : null}
               </div>
 
-              <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ position: 'relative', flex: 1 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 0 }}>
                   <Mail size={15} color="var(--text-muted)" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }} />
                   <input
                     required
@@ -484,7 +467,13 @@ export default function LoginPage() {
                     style={{ paddingLeft: 38 }}
                     placeholder="you@domain.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (emailSent) {
+                        setEmailSent(false);
+                        setEmailOtp('');
+                      }
+                    }}
                   />
                 </div>
                 {!emailVerified && (
@@ -502,11 +491,12 @@ export default function LoginPage() {
               </div>
 
               {emailSent && !emailVerified && (
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <input
                     maxLength={6}
                     inputMode="numeric"
                     className="input-field"
+                    style={{ flex: '1 1 160px', minWidth: 0 }}
                     placeholder="Enter 6-digit Email OTP"
                     value={emailOtp}
                     onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -529,8 +519,8 @@ export default function LoginPage() {
                 ) : null}
               </div>
 
-              <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'stretch', flex: 1 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'stretch', flex: '1 1 200px', minWidth: 0 }}>
                   <span
                     style={{
                       display: 'inline-flex',
@@ -558,7 +548,13 @@ export default function LoginPage() {
                     style={{ borderRadius: '0 16px 16px 0', borderColor: phoneInvalid ? '#EF4444' : undefined }}
                     placeholder="10-digit number"
                     value={phoneDigits}
-                    onChange={(e) => setPhoneDigits(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onChange={(e) => {
+                      setPhoneDigits(e.target.value.replace(/\D/g, '').slice(0, 10));
+                      if (phoneSent) {
+                        setPhoneSent(false);
+                        setPhoneOtp('');
+                      }
+                    }}
                   />
                 </div>
                 {!phoneVerified && (
@@ -576,11 +572,12 @@ export default function LoginPage() {
               </div>
 
               {phoneSent && !phoneVerified && (
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <input
                     maxLength={6}
                     inputMode="numeric"
                     className="input-field"
+                    style={{ flex: '1 1 160px', minWidth: 0 }}
                     placeholder="Enter 6-digit SMS OTP"
                     value={phoneOtp}
                     onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
