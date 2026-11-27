@@ -15,6 +15,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { getCategoryInfo } from '../utils/constants';
 import { apiFetch, formatDateShort, getDirectionsUrl } from '../utils/api';
+import { applyPageSeo } from '../components/SeoHead';
 
 export default function EventDetailPage() {
   const { id } = useParams();
@@ -42,7 +43,18 @@ export default function EventDetailPage() {
     setLoading(true);
     apiFetch(`/api/events/${encodeURIComponent(id)}`)
       .then((d) => {
-        if (active) setEvent(d.event || d);
+        if (!active) return;
+        const ev = d.event || d;
+        setEvent(ev);
+        if (ev?.title) {
+          const desc = String(ev.description || '').replace(/\s+/g, ' ').trim().slice(0, 160) || `Join ${ev.title} in ${ev.city || 'India'} with SERVEO.`;
+          applyPageSeo({
+            title: `${ev.title} in ${ev.city || ev.state || 'India'} | SERVEO`,
+            description: desc,
+            canonicalPath: `/event/${encodeURIComponent(String(ev.id))}`,
+            noIndex: ev.status !== 'approved'
+          });
+        }
       })
       .catch(() => {
         if (active) setEvent(null);

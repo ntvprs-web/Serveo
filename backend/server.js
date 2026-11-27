@@ -1881,20 +1881,35 @@ const seoPages = {
 };
 const noIndexPages = new Set(['login.html', 'organizer.html', 'post-event.html', 'premium.html', 'seed.html', 'event-detail.html', 'my-hours.html']);
 const configuredSiteUrl = process.env.SITE_URL || (process.env.ALLOWED_ORIGINS || '')
-  .split(',').map(value => value.trim()).find(value => /^https:\/\//i.test(value));
+  .split(',').map(value => value.trim()).find(value => /^https?:\/\//i.test(value));
 let seoSiteOrigin = '';
 try {
   const parsedSiteUrl = new URL(configuredSiteUrl || '');
   if (['http:', 'https:'].includes(parsedSiteUrl.protocol)) seoSiteOrigin = parsedSiteUrl.origin;
 } catch { }
 
+function getSiteOrigin(req) {
+  if (seoSiteOrigin) return seoSiteOrigin;
+  if (!req) return '';
+  const forwardedProto = String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim();
+  const protocol = ['http', 'https'].includes(forwardedProto) ? forwardedProto : (req.protocol === 'https' ? 'https' : 'http');
+  const host = String(req.headers?.['x-forwarded-host'] || req.get?.('host') || '').split(',')[0].trim();
+  if (!host) return '';
+  try {
+    const parsed = new URL(`${protocol}://${host}`);
+    if (['http:', 'https:'].includes(parsed.protocol)) return parsed.origin;
+  } catch { }
+  return '';
+}
+
 function htmlEscape(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
 
-function seoHtml(html, { title, description, canonicalPath, noIndex = false, structuredData = null }) {
+function seoHtml(html, { title, description, canonicalPath, noIndex = false, structuredData = null, siteOrigin = seoSiteOrigin }) {
   const safeTitle = htmlEscape(title);
   const safeDescription = htmlEscape(description);
+  const origin = siteOrigin || '';
   html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/i, `<title>${safeTitle}</title>`);
   html = html.replace(/<\/head>/i, `  <script>window.SERVEO_DATA_MODE=${JSON.stringify(db.publicMode ? 'public' : 'private')};window.SERVEO_DEMO_DATA=${JSON.stringify(Boolean(db.demoDataEnabled))};</script>\n</head>`);
   const descriptionTag = `<meta name="description" content="${safeDescription}">`;
@@ -1903,28 +1918,90 @@ function seoHtml(html, { title, description, canonicalPath, noIndex = false, str
   } else {
     html = html.replace(/<\/head>/i, `  ${descriptionTag}\n</head>`);
   }
+  html = html.replace(/\s*<meta\s+name=["']robots["'][^>]*>/gi, '');
   html = html.replace(/\s*<link\s+rel=["']canonical["'][^>]*>/gi, '');
   html = html.replace(/\s*<meta\s+(?:property=["']og:[^"']+["']|name=["']twitter:[^"']+["'])[^>]*>/gi, '');
-  const canonical = seoSiteOrigin ? `${seoSiteOrigin}${canonicalPath}` : '';
+  html = html.replace(/\s*<script\s+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi, '');
+  const normalizedPath = canonicalPath && canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath || ''}`;
+  const canonical = origin ? `${origin}${normalizedPath}` : normalizedPath;
+  const ogImage = origin ? `${origin}/images/icon-512.png` : '/images/icon-512.png';
   const tags = [
     noIndex ? '<meta name="robots" content="noindex,follow">' : '<meta name="robots" content="index,follow">',
-    canonical ? `<link rel="canonical" href="${htmlEscape(canonical)}">` : '',
+    `<link rel="canonical" href="${htmlEscape(canonical)}">`,
+    '<meta property="og:site_name" content="SERVEO">',
+    '<meta property="og:locale" content="en_IN">',
     '<meta property="og:type" content="website">',
     `<meta property="og:title" content="${safeTitle}">`,
     `<meta property="og:description" content="${safeDescription}">`,
-    canonical ? `<meta property="og:url" content="${htmlEscape(canonical)}">` : '',
-    seoSiteOrigin ? `<meta property="og:image" content="${htmlEscape(`${seoSiteOrigin}/images/icon-512.png`)}">` : '',
-    '<meta name="twitter:card" content="summary">',
+    `<meta property="og:url" content="${htmlEscape(canonical)}">`,
+    `<meta property="og:image" content="${htmlEscape(ogImage)}">`,
+    '<meta name="twitter:card" content="summary_large_image">',
     `<meta name="twitter:title" content="${safeTitle}">`,
     `<meta name="twitter:description" content="${safeDescription}">`,
-    seoSiteOrigin ? `<meta name="twitter:image" content="${htmlEscape(`${seoSiteOrigin}/images/icon-512.png`)}">` : '',
+    `<meta name="twitter:image" content="${htmlEscape(ogImage)}">`,
     structuredData ? `<script type="application/ld+json">${JSON.stringify(structuredData).replace(/</g, '\\u003c')}</script>` : ''
   ].filter(Boolean).join('\n  ');
   return html.replace(/<\/head>/i, `  ${tags}\n</head>`);
 }
 
-async function sendSeoPage(res, filename, options = {}) {
+async function buildDefaultStructuredData(filename, origin, page, description) {
+  if (filename === 'index.html') {
+    return {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'WebSite',
+          name: 'SERVEO',
+          url: origin || undefined,
+          description
+        },
+        {
+          '@type': 'Organization',
+          name: 'SERVEO',
+          url: origin || undefined,
+          logo: origin ? `${origin}/images/icon-512.png` : undefined
+        }
+      ]
+    };
+  }
+  if (filename === 'events.html') {
+    let itemListElement = [];
+    try {
+      const events = await db.getEvents({ status: 'approved' });
+      itemListElement = events.slice(0, 20).map((ev, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: origin && ev.id ? `${origin}/event/${encodeURIComponent(String(ev.id))}` : undefined,
+        name: ev.title
+      }));
+    } catch { }
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: page.title || 'SERVEO Community Events',
+      description,
+      url: origin ? `${origin}/events` : undefined,
+      mainEntity: {
+        '@type': 'ItemList',
+        itemListElement
+      }
+    };
+  }
+  if (filename === 'about.html') {
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'AboutPage',
+      name: page.title || 'About SERVEO',
+      description,
+      url: origin ? `${origin}/about` : undefined
+    };
+  }
+  return null;
+}
+
+async function sendSeoPage(req, res, filename, options = {}) {
   const page = seoPages[filename] || {};
+  const origin = options.siteOrigin || getSiteOrigin(req);
   let html;
   try {
     html = await fs.promises.readFile(path.join(frontendPath, filename), 'utf8');
@@ -1937,57 +2014,81 @@ async function sendSeoPage(res, filename, options = {}) {
   }
   const title = options.title || page.title || 'SERVEO | Community Service Events';
   const description = options.description || page.description || 'Discover and support community service events with SERVEO.';
-  const structuredData = options.structuredData || (filename === 'index.html' ? {
-    '@context': 'https://schema.org', '@type': 'WebSite', name: 'SERVEO', url: seoSiteOrigin || undefined,
-    description: page.description
-  } : null);
+  const structuredData = options.structuredData || await buildDefaultStructuredData(filename, origin, page, description);
   res.type('html').send(seoHtml(html, {
     title, description, canonicalPath: options.canonicalPath || page.path || '/',
-    noIndex: options.noIndex ?? noIndexPages.has(filename), structuredData
+    noIndex: options.noIndex ?? noIndexPages.has(filename), structuredData, siteOrigin: origin
   }));
 }
 
 app.get('/robots.txt', (req, res) => {
-  const sitemapLine = seoSiteOrigin ? `Sitemap: ${seoSiteOrigin}/sitemap.xml\n` : '';
-  res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\n${sitemapLine}`);
+  const origin = getSiteOrigin(req);
+  const sitemapLine = origin ? `Sitemap: ${origin}/sitemap.xml\n` : '';
+  res.type('text/plain').send(
+    `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /login\nDisallow: /organizer\nDisallow: /my-hours\nDisallow: /post-event\nDisallow: /seed\n${sitemapLine}`
+  );
 });
 
 app.get('/sitemap.xml', async (req, res) => {
-  if (!seoSiteOrigin) return res.status(503).type('text/plain').send('Set SITE_URL to the public HTTPS site URL to generate the sitemap.');
-  const urls = Object.entries(seoPages).filter(([filename]) => !noIndexPages.has(filename)).map(([, page]) => page.path);
+  const origin = getSiteOrigin(req);
+  if (!origin) return res.status(503).type('text/plain').send('Unable to resolve site origin for sitemap.');
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = Object.entries(seoPages)
+    .filter(([filename]) => !noIndexPages.has(filename))
+    .map(([, page]) => ({
+      route: page.path,
+      lastmod: today,
+      changefreq: page.path === '/' || page.path === '/events' ? 'daily' : 'weekly',
+      priority: page.path === '/' ? '1.0' : (page.path === '/events' ? '0.9' : '0.7')
+    }));
   try {
     const events = await db.getEvents({ status: 'approved' });
-    for (const event of events) if (event.id) urls.push(`/event/${encodeURIComponent(String(event.id))}`);
+    for (const event of events) {
+      if (event.id) {
+        const lastmod = String(event.updatedAt || event.updated_at || event.createdAt || event.created_at || today).slice(0, 10);
+        entries.push({
+          route: `/event/${encodeURIComponent(String(event.id))}`,
+          lastmod: /^\d{4}-\d{2}-\d{2}$/.test(lastmod) ? lastmod : today,
+          changefreq: 'weekly',
+          priority: '0.8'
+        });
+      }
+    }
   } catch (error) { console.error('Sitemap event lookup failed:', error.message); }
-  const uniqueUrls = [...new Set(urls)];
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${uniqueUrls.map(route => `  <url><loc>${htmlEscape(`${seoSiteOrigin}${route}`)}</loc></url>`).join('\n')}\n</urlset>`;
+  const seen = new Set();
+  const uniqueEntries = entries.filter(entry => {
+    if (seen.has(entry.route)) return false;
+    seen.add(entry.route);
+    return true;
+  });
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${uniqueEntries.map(entry => `  <url><loc>${htmlEscape(`${origin}${entry.route}`)}</loc><lastmod>${htmlEscape(entry.lastmod)}</lastmod><changefreq>${entry.changefreq}</changefreq><priority>${entry.priority}</priority></url>`).join('\n')}\n</urlset>`;
   res.type('application/xml').send(xml);
 });
 
 app.get(/^\/(index|events|about|impact|map|urgent-blood|blood-donation|food-donation|my-hours|privacy|terms|login|organizer|post-event|premium|badges|seed|event-detail)\.html$/, (req, res) => {
   const filename = path.basename(req.path);
-  return sendSeoPage(res, filename);
+  return sendSeoPage(req, res, filename);
 });
 
-app.use(express.static(frontendPath));
+app.use(express.static(frontendPath, { index: false }));
 
 // Clean URLs & friendly route aliases
 const htmlRoutes = ['map', 'events', 'event-detail', 'events-detail', 'event', 'post-event', 'organizer', 'organization', 'dashboard', 'impact', 'my-hours', 'about', 'seed', 'login', 'premium', 'terms', 'privacy', 'urgent-blood', 'blood-donation', 'food-donation', 'badges'];
 htmlRoutes.forEach(r => {
   app.get(`/${r}`, (req, res) => {
     if (['event', 'events-detail'].includes(r)) {
-      return sendSeoPage(res, 'event-detail.html', { canonicalPath: '/event-detail', noIndex: true });
+      return sendSeoPage(req, res, 'event-detail.html', { canonicalPath: '/event-detail', noIndex: true });
     }
     if (['organization', 'dashboard'].includes(r)) {
-      return sendSeoPage(res, 'organizer.html', { canonicalPath: '/organizer', noIndex: true });
+      return sendSeoPage(req, res, 'organizer.html', { canonicalPath: '/organizer', noIndex: true });
     }
-    return sendSeoPage(res, `${r}.html`, { canonicalPath: `/${r}` });
+    return sendSeoPage(req, res, `${r}.html`, { canonicalPath: `/${r}` });
   });
 });
 
 // Organization login dedicated URL redirects / routes
 app.get(['/organization-login', '/organizer-login', '/org-login'], (req, res) => {
-  res.redirect('/login.html?role=organizer');
+  res.redirect('/login?role=organizer');
 });
 
 // Dynamic event-detail routes: /event/1, /event-detail/1, /events-detail/1
@@ -1995,33 +2096,37 @@ app.get(['/event/:id', '/event-detail/:id', '/events-detail/:id'], async (req, r
   const event = await db.getEventById(req.params.id).catch(() => null);
   // Serve only the detail-page shell for pending/private records. The page
   // fetches those records through the authenticated /api/events/mine endpoint.
-  if (!event || event.status !== 'approved') return sendSeoPage(res, 'event-detail.html', { canonicalPath: `/event/${encodeURIComponent(req.params.id)}`, noIndex: true });
+  if (!event || event.status !== 'approved') return sendSeoPage(req, res, 'event-detail.html', { canonicalPath: `/event/${encodeURIComponent(req.params.id)}`, noIndex: true });
+  const origin = getSiteOrigin(req);
   const description = String(event.description || '').replace(/\s+/g, ' ').trim().slice(0, 300) || `Join ${event.title} in ${event.city || event.state || 'your community'} with SERVEO.`;
   const canonicalPath = `/event/${encodeURIComponent(String(event.id))}`;
   const structuredData = {
     '@context': 'https://schema.org', '@type': 'Event', name: event.title,
     description, startDate: `${event.date}T${event.startTime || '00:00'}:00+05:30`,
     endDate: `${event.date}T${event.endTime || event.startTime || '23:59'}:00+05:30`,
+    image: origin ? [`${origin}/images/icon-512.png`] : undefined,
     eventStatus: 'https://schema.org/EventScheduled', eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     location: { '@type': 'Place', name: [event.city, event.district, event.state].filter(Boolean).join(', '), address: {
       '@type': 'PostalAddress', streetAddress: event.address || '', addressLocality: event.city || '', addressRegion: event.state || '', postalCode: event.pincode || '', addressCountry: 'IN'
     }, ...(Number.isFinite(Number(event.lat)) && Number.isFinite(Number(event.lng)) ? { geo: { '@type': 'GeoCoordinates', latitude: Number(event.lat), longitude: Number(event.lng) } } : {}) },
-    organizer: { '@type': 'Organization', name: event.organizer || 'SERVEO' }, url: seoSiteOrigin ? `${seoSiteOrigin}${canonicalPath}` : undefined
+    organizer: { '@type': 'Organization', name: event.organizer || 'SERVEO' }, url: origin ? `${origin}${canonicalPath}` : undefined
   };
-  return sendSeoPage(res, 'event-detail.html', {
-    title: `${event.title} in ${event.city || event.state || 'India'} | SERVEO`, description, canonicalPath, structuredData
+  return sendSeoPage(req, res, 'event-detail.html', {
+    title: `${event.title} in ${event.city || event.state || 'India'} | SERVEO`, description, canonicalPath, structuredData, siteOrigin: origin, noIndex: false
   });
 });
 
 // Root route
 app.get('/', (req, res) => {
-  sendSeoPage(res, 'index.html', { canonicalPath: '/' });
+  sendSeoPage(req, res, 'index.html', { canonicalPath: '/' });
 });
 
-// Fallback to index.html for unrecognized non-API routes
+// Fallback 404 for unrecognized non-API routes
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
-  res.status(404).send('Page not found');
+  res.status(404).type('html').send(
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>404 Page Not Found | SERVEO</title></head><body><main><h1>404 - Page Not Found</h1><p>The requested page does not exist on SERVEO. <a href="/">Return home</a>.</p></main></body></html>'
+  );
 });
 
 // ==================== START SERVER ====================

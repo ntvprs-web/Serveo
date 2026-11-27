@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import AppShell from './components/AppShell';
+import SeoHead from './components/SeoHead';
 import HomePage from './pages/HomePage';
 import EventsPage from './pages/EventsPage';
 import MapPage from './pages/MapPage';
@@ -21,6 +22,7 @@ import { AboutPage, LegalPage } from './pages/StaticInfoPages';
 export default function App() {
   return (
     <BrowserRouter>
+      <SeoHead />
       <AppProvider>
         <AppShell>
           <Routes>
