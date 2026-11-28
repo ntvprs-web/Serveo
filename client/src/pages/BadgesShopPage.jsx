@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Award, Clock, Sparkles, ShieldCheck, Phone, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -26,6 +26,15 @@ export default function BadgesShopPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const emailInvalid = buyerEmail.trim().length > 0 && !EMAIL_RE.test(buyerEmail.trim());
+
+  useEffect(() => {
+    if (!checkoutBadge) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setCheckoutBadge(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [checkoutBadge]);
 
   const openCheckout = (cat, price) => {
     if (!user) {
@@ -205,6 +214,10 @@ export default function BadgesShopPage() {
       {/* Verified Badge Checkout Modal */}
       {checkoutBadge && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="badge-checkout-title"
+          onClick={() => setCheckoutBadge(null)}
           style={{
             position: 'fixed',
             inset: 0,
@@ -217,7 +230,7 @@ export default function BadgesShopPage() {
             padding: 16
           }}
         >
-          <div className="card" style={{ width: '100%', maxWidth: 500, padding: 24, maxHeight: '92vh', overflowY: 'auto' }}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 500, padding: 24, maxHeight: '92vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                 <BadgeMedallion
@@ -229,7 +242,7 @@ export default function BadgesShopPage() {
                   animated={false}
                 />
                 <div style={{ minWidth: 0 }}>
-                  <h3 style={{ margin: 0, fontSize: '1.12rem' }}>{checkoutBadge.sealName || checkoutBadge.label}</h3>
+                  <h3 id="badge-checkout-title" style={{ margin: 0, fontSize: '1.12rem' }}>{checkoutBadge.sealName || checkoutBadge.label}</h3>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                     ₹{checkoutBadge.price} · Lifetime {checkoutBadge.label} Verification
                   </div>
@@ -283,6 +296,9 @@ export default function BadgesShopPage() {
                 <label className="form-label">6-Digit Mobile OTP</label>
                 <input required maxLength={6} className="input-field" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="Enter 6-digit OTP" />
               </div>
+              <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                By purchasing, you agree to our <Link to="/refund-policy" style={{ textDecoration: 'underline' }}>Refund Policy</Link> and <Link to="/privacy" style={{ textDecoration: 'underline' }}>Privacy Policy</Link>.
+              </p>
               <button type="submit" disabled={submitting || emailInvalid} className="pill-btn pill-btn-gold" style={{ width: '100%', padding: '12px', marginTop: 4 }}>
                 <ShieldCheck size={15} /> {submitting ? 'Verifying & Saving...' : `Verify OTP & Complete Purchase (₹${checkoutBadge.price})`}
               </button>

@@ -160,6 +160,9 @@ export default function PremiumPage() {
                 <label className="form-label">6-Digit Mobile OTP</label>
                 <input required maxLength={6} className="input-field" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="Enter 6-digit OTP" />
               </div>
+              <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                Covered by our <Link to="/refund-policy" style={{ textDecoration: 'underline' }}>Refund &amp; Cancellation Policy</Link> and <Link to="/privacy" style={{ textDecoration: 'underline' }}>Privacy Policy</Link>.
+              </p>
               <button type="submit" disabled={submitting || emailInvalid} className="pill-btn pill-btn-gold" style={{ width: '100%', padding: '12px', marginTop: 4 }}>
                 <Sparkles size={16} /> {submitting ? 'Verifying & Saving...' : 'Verify OTP & Activate Premium'}
               </button>

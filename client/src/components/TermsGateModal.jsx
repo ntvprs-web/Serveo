@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { SERVEO_LEGAL_SECTIONS, SERVEO_TERMS_VERSION } from '../utils/legal';
@@ -17,6 +18,9 @@ export default function TermsGateModal() {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="terms-modal-title"
       style={{
         position: 'fixed',
         inset: 0,
@@ -41,6 +45,7 @@ export default function TermsGateModal() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <div
+            aria-hidden="true"
             style={{
               width: 38,
               height: 38,
@@ -55,7 +60,7 @@ export default function TermsGateModal() {
             <ShieldCheck size={20} />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>
+            <h2 id="terms-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>
               Welcome to SERVEO
             </h2>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -65,8 +70,9 @@ export default function TermsGateModal() {
         </div>
 
         <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '8px 0 14px' }}>
-          SERVEO connects volunteers, donors, and verified community organizers across India. Please review and accept
-          our Terms of Use before exploring or hosting events.
+          SERVEO connects volunteers, donors, and verified community organizers across India. Review our Terms of Use,{' '}
+          <Link to="/privacy" style={{ textDecoration: 'underline', fontWeight: 600 }}>Privacy Policy</Link>, and{' '}
+          <Link to="/cookies" style={{ textDecoration: 'underline', fontWeight: 600 }}>Cookie Policy</Link> before continuing.
         </p>
 
         {!expanded ? (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Compass,
@@ -25,9 +25,10 @@ import {
   Crown
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { getGreeting } from '../utils/api';
 import TermsGateModal from './TermsGateModal';
 import EmergencyAlertPopup from './EmergencyAlertPopup';
+import CookieConsentBanner from './CookieConsentBanner';
+import { SERVEO_BUSINESS_DETAILS } from '../utils/legal';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Explore', icon: Compass },
@@ -60,7 +61,8 @@ export default function AppShell({ children }) {
     events,
     disasterMode,
     toasts,
-    termsAccepted
+    termsAccepted,
+    setCookieBannerOpen
   } = useApp();
 
   const location = useLocation();
@@ -69,6 +71,17 @@ export default function AppShell({ children }) {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (mobileDrawerOpen) setMobileDrawerOpen(false);
+        if (notifOpen) setNotifOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileDrawerOpen, notifOpen]);
 
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
@@ -104,6 +117,9 @@ export default function AppShell({ children }) {
       className="app-shell"
       style={{ '--active-sidebar-width': sidebarExpanded ? '256px' : '76px' }}
     >
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
       {/* Desktop Collapsible Icon-Rail / Hamburger Sidebar */}
       <aside
         className="desktop-sidebar"
@@ -127,15 +143,12 @@ export default function AppShell({ children }) {
           {sidebarExpanded && (
             <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
               <img
-                src="/images/serveo-logo.jpg"
+                src="/images/serveo-logo.png"
                 alt="SERVEO Logo"
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: 12,
-                  objectFit: 'cover',
-                  border: '1px solid var(--border-subtle)',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.16)'
+                  objectFit: 'contain'
                 }}
               />
               <span style={{ fontWeight: 800, fontSize: '1.02rem', letterSpacing: '-0.02em' }}>SERVEO</span>
@@ -144,6 +157,7 @@ export default function AppShell({ children }) {
           <button
             type="button"
             onClick={() => setSidebarExpanded((v) => !v)}
+            aria-expanded={sidebarExpanded}
             aria-label={sidebarExpanded ? 'Collapse menu' : 'Expand menu'}
             title={sidebarExpanded ? 'Collapse menu' : 'Expand menu'}
             style={{
@@ -434,6 +448,7 @@ export default function AppShell({ children }) {
               <button
                 type="button"
                 onClick={() => setMobileDrawerOpen(true)}
+                aria-expanded={mobileDrawerOpen}
                 aria-label="Open navigation menu"
                 className="mobile-menu-trigger"
                 style={{
@@ -452,25 +467,19 @@ export default function AppShell({ children }) {
                 <Menu size={18} />
               </button>
 
-              <Link to="/" aria-label="SERVEO Home" style={{ flexShrink: 0 }}>
+              <Link to="/" aria-label="SERVEO Home" style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                 <img
-                  src="/images/serveo-logo.jpg"
+                  src="/images/serveo-logo.png"
                   alt="SERVEO"
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 11,
-                    objectFit: 'cover',
-                    border: '1px solid var(--border-subtle)',
-                    boxShadow: 'var(--shadow-xs)'
+                    width: 38,
+                    height: 38,
+                    objectFit: 'contain'
                   }}
                 />
               </Link>
 
               <div className="app-header-brand">
-                <div className="app-header-greeting">
-                  {getGreeting()} · Alert Range: 0–{alertRadiusKm} km {isPremium ? '✨' : ''}
-                </div>
                 <div className="app-header-title">
                   {user ? (
                     <>
@@ -510,6 +519,7 @@ export default function AppShell({ children }) {
               <button
                 type="button"
                 onClick={() => setNotifOpen(v => !v)}
+                aria-expanded={notifOpen}
                 aria-label="Emergency & Proximity Notifications"
                 style={{
                   width: 38,
@@ -590,9 +600,27 @@ export default function AppShell({ children }) {
           </div>
         </header>
 
-        <main className="app-container" style={{ flex: 1 }}>
+        <main id="main-content" tabIndex={-1} className="app-container" style={{ flex: 1 }}>
           {children}
         </main>
+
+        <footer className="app-footer">
+          <div className="app-container app-footer-inner">
+            <div>
+              <strong>{SERVEO_BUSINESS_DETAILS.entityName}</strong> · Operated by {SERVEO_BUSINESS_DETAILS.operatorName} · {SERVEO_BUSINESS_DETAILS.address}
+            </div>
+            <nav aria-label="Legal and accessibility links" className="app-footer-links">
+              <Link to="/privacy">Privacy Policy</Link>
+              <Link to="/terms">Terms of Service</Link>
+              <Link to="/refund-policy">Refund Policy</Link>
+              <Link to="/cookies">Cookie Policy</Link>
+              <button type="button" onClick={() => setCookieBannerOpen(true)}>Cookie Preferences</button>
+              <Link to="/privacy#data-deletion">Data Deletion Request</Link>
+              <Link to="/unsubscribe">Email Unsubscribe</Link>
+              <Link to="/licenses">Fonts &amp; Image Licenses</Link>
+            </nav>
+          </div>
+        </footer>
       </div>
 
       <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
@@ -618,6 +646,7 @@ export default function AppShell({ children }) {
       </nav>
 
       <EmergencyAlertPopup />
+      <CookieConsentBanner />
 
       <div className="toast-stack" aria-live="polite">
         {toasts.map(t => (

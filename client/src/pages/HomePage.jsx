@@ -96,14 +96,12 @@ export default function HomePage() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, maxWidth: 620, minWidth: 0, flex: '1 1 260px' }}>
           <img
-            src="/images/serveo-logo.jpg"
+            src="/images/serveo-logo.png"
             alt="SERVEO Icon"
             style={{
-              width: 56,
-              height: 56,
-              borderRadius: 16,
-              objectFit: 'cover',
-              boxShadow: 'var(--shadow-md)',
+              width: 58,
+              height: 58,
+              objectFit: 'contain',
               flexShrink: 0
             }}
           />

@@ -444,3 +444,23 @@ ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS payment_method VARCHAR(40) DEFA
 ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(120) DEFAULT '';
 ALTER TABLE user_badges ADD COLUMN IF NOT EXISTS otp_verified BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_user_badges_user_equipped ON user_badges(user_id, equipped);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS age_consent_type VARCHAR(40);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS guardian_name VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_unsubscribed BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS email_unsubscribes (
+    email VARCHAR(255) PRIMARY KEY,
+    reason VARCHAR(255) DEFAULT '',
+    unsubscribed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS data_deletion_requests (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64),
+    email VARCHAR(255) DEFAULT '',
+    request_type VARCHAR(40) NOT NULL DEFAULT 'erasure',
+    reason TEXT DEFAULT '',
+    status VARCHAR(30) NOT NULL DEFAULT 'completed',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

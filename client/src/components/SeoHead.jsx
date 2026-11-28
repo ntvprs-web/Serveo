@@ -57,6 +57,26 @@ const ROUTE_SEO = {
     description: 'Read how SERVEO protects your personal, location, donor, and account data with strict access controls.',
     noIndex: false
   },
+  '/refund-policy': {
+    title: 'Refund & Cancellation Policy | SERVEO',
+    description: 'Review refund eligibility and cancellation terms for SERVEO Organizer Badges and Premium plans.',
+    noIndex: false
+  },
+  '/cookies': {
+    title: 'Cookie & Local Storage Policy | SERVEO',
+    description: 'See every essential cookie and browser storage preference used on SERVEO.',
+    noIndex: false
+  },
+  '/licenses': {
+    title: 'Fonts, Images & Open-Source Licenses | SERVEO',
+    description: 'Attribution and license disclosures for SERVEO fonts, Unsplash photography, icons, and software packages.',
+    noIndex: false
+  },
+  '/unsubscribe': {
+    title: 'Email Preferences & Unsubscribe | SERVEO',
+    description: 'Opt out of non-essential SERVEO emails and event alert notifications.',
+    noIndex: true
+  },
   '/login': {
     title: 'Sign In or Register | SERVEO',
     description: 'Sign in or register a dual-verified SERVEO Volunteer or Organization account.',

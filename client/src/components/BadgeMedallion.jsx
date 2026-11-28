@@ -56,6 +56,8 @@ export default function BadgeMedallion({
 
   return (
     <div
+      role="img"
+      aria-label={`${badgeKey.replace(/-/g, ' ')} ${verified ? 'verified' : 'locked'} badge crest`}
       className={`badge-crest ${animated && !locked ? 'badge-crest-animated' : ''}`}
       style={{
         width: size,

@@ -43,6 +43,8 @@ class DatabaseManager {
       this.pool = new Pool({
         connectionString: databaseUrl,
         connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
+        keepAlive: true,
         ...(isRemoteDb ? { ssl: { rejectUnauthorized: false } } : {}),
       });
       this.pool.on('error', (err) => {
@@ -158,6 +160,8 @@ class DatabaseManager {
     if (!Array.isArray(this.fallbackData.volunteer_attendance_records)) this.fallbackData.volunteer_attendance_records = [];
     if (!Array.isArray(this.fallbackData.volunteer_hours_certificates)) this.fallbackData.volunteer_hours_certificates = [];
     if (!Array.isArray(this.fallbackData.impact_demo_monthly_samples)) this.fallbackData.impact_demo_monthly_samples = [];
+    if (!Array.isArray(this.fallbackData.email_unsubscribes)) this.fallbackData.email_unsubscribes = [];
+    if (!Array.isArray(this.fallbackData.data_deletion_requests)) this.fallbackData.data_deletion_requests = [];
     if (!Array.isArray(this.fallbackData.disaster_mode_audit)) this.fallbackData.disaster_mode_audit = [];
     if (!this.fallbackData.disaster_mode) this.fallbackData.disaster_mode = { active: false };
     if (!Array.isArray(this.fallbackData.notifications)) this.fallbackData.notifications = [];
@@ -781,7 +785,7 @@ class DatabaseManager {
     }
   }
 
-  async createUser({ name, username, email, phone, passwordHash, notificationLat, notificationLng, bloodGroup, homeCity, organizationType = null }) {
+  async createUser({ name, username, email, phone, passwordHash, notificationLat, notificationLng, bloodGroup, homeCity, organizationType = null, ageConsentType = 'adult_18_plus', guardianName = null }) {
     const id = 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     const now = new Date().toISOString();
 
@@ -796,6 +800,9 @@ class DatabaseManager {
       passwordHash,
       bloodGroup: bloodGroup || null,
       organizationType: organizationType || null,
+      ageConsentType: ageConsentType === 'minor_with_guardian_consent' ? 'minor_with_guardian_consent' : 'adult_18_plus',
+      guardianName: ageConsentType === 'minor_with_guardian_consent' ? (guardianName || null) : null,
+      emailUnsubscribed: false,
       lastDonationDate: null,
       donationCooldownDays: null,
       donationReminderSentDate: null,
@@ -815,12 +822,13 @@ class DatabaseManager {
 
     if (this.mode === 'postgres') {
       await this.pool.query(
-        `INSERT INTO users (id, name, username, email, email_verified, phone, phone_verified, password_hash, blood_group, organization_type, notification_lat, notification_lng, notifications_enabled, subscription_status, organization_banned, false_alarm_count, is_admin, home_city, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+        `INSERT INTO users (id, name, username, email, email_verified, phone, phone_verified, password_hash, blood_group, organization_type, age_consent_type, guardian_name, email_unsubscribed, notification_lat, notification_lng, notifications_enabled, subscription_status, organization_banned, false_alarm_count, is_admin, home_city, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
         [
           user.id, user.name, user.username, user.email, user.emailVerified,
-          user.phone, user.phoneVerified, user.passwordHash, user.bloodGroup, user.organizationType, user.notificationLat,
-          user.notificationLng, user.notificationsEnabled, user.subscriptionStatus,
+          user.phone, user.phoneVerified, user.passwordHash, user.bloodGroup, user.organizationType,
+          user.ageConsentType, user.guardianName, user.emailUnsubscribed,
+          user.notificationLat, user.notificationLng, user.notificationsEnabled, user.subscriptionStatus,
           user.organizationBanned, user.falseAlarmCount, user.isAdmin, user.homeCity, now, now
         ]
       );
@@ -1968,6 +1976,9 @@ class DatabaseManager {
       phoneVerified: r.phone_verified,
       bloodGroup: r.blood_group || null,
       organizationType: r.organization_type || null,
+      ageConsentType: r.age_consent_type || 'adult_18_plus',
+      guardianName: r.guardian_name || null,
+      emailUnsubscribed: Boolean(r.email_unsubscribed),
       lastDonationDate: r.last_donation_date ? String(r.last_donation_date).slice(0,10) : null,
       donationCooldownDays: r.donation_cooldown_days || null,
       leaderboardOptOut: Boolean(r.leaderboard_opt_out),
@@ -2182,6 +2193,105 @@ class DatabaseManager {
     entry.equipped = Boolean(equipped);
     this.saveFallback();
     return this.getUserBadges(userId);
+  }
+
+  async unsubscribeEmail(email, reason = 'user_request') {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!cleanEmail) return null;
+    const now = new Date().toISOString();
+    if (this.mode === 'postgres') {
+      await this.pool.query(
+        `INSERT INTO email_unsubscribes (email, reason, unsubscribed_at)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (email) DO UPDATE SET reason = $2, unsubscribed_at = $3`,
+        [cleanEmail, String(reason || '').slice(0, 255), now]
+      );
+      await this.pool.query(
+        `UPDATE users SET email_unsubscribed = TRUE, notifications_enabled = FALSE, updated_at = $2 WHERE LOWER(email) = $1`,
+        [cleanEmail, now]
+      );
+      return { email: cleanEmail, unsubscribedAt: now };
+    }
+    if (!Array.isArray(this.fallbackData.email_unsubscribes)) this.fallbackData.email_unsubscribes = [];
+    this.fallbackData.email_unsubscribes = this.fallbackData.email_unsubscribes.filter(r => r.email !== cleanEmail);
+    this.fallbackData.email_unsubscribes.push({ email: cleanEmail, reason: String(reason || '').slice(0, 255), unsubscribedAt: now });
+    for (const u of this.fallbackData.users) {
+      if (String(u.email || '').toLowerCase() === cleanEmail) {
+        u.emailUnsubscribed = true;
+        u.notificationsEnabled = false;
+        u.updatedAt = now;
+      }
+    }
+    this.saveFallback();
+    return { email: cleanEmail, unsubscribedAt: now };
+  }
+
+  async createDataDeletionRequest({ userId = null, email = '', requestType = 'erasure', reason = '', status = 'pending' }) {
+    const id = 'del_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex');
+    const createdAt = new Date().toISOString();
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const record = {
+      id,
+      userId: userId ? String(userId) : null,
+      email: cleanEmail,
+      requestType: String(requestType || 'erasure').slice(0, 40),
+      reason: String(reason || '').slice(0, 500),
+      status: String(status || 'pending').slice(0, 30),
+      createdAt
+    };
+    if (this.mode === 'postgres') {
+      await this.pool.query(
+        `INSERT INTO data_deletion_requests (id, user_id, email, request_type, reason, status, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [record.id, record.userId, record.email, record.requestType, record.reason, record.status, createdAt]
+      );
+      return record;
+    }
+    if (!Array.isArray(this.fallbackData.data_deletion_requests)) this.fallbackData.data_deletion_requests = [];
+    this.fallbackData.data_deletion_requests.push(record);
+    this.saveFallback();
+    return record;
+  }
+
+  async deleteUserAndData(userId, reason = 'user_self_deletion') {
+    const uid = String(userId);
+    const user = await this.findUserById(uid);
+    if (!user) return null;
+    const cleanEmail = String(user.email || '').trim().toLowerCase();
+
+    if (this.mode === 'postgres') {
+      await this.pool.query(`UPDATE volunteer_applications SET applicant_name = 'Deleted User', applicant_phone = NULL, applicant_email = NULL, tracking_lat = NULL, tracking_lng = NULL WHERE user_id = $1`, [uid]);
+      await this.pool.query(`UPDATE website_inquiries SET name = 'Deleted User', email = 'deleted@redacted.invalid', phone = '' WHERE user_id = $1`, [uid]);
+      await this.pool.query(`UPDATE premium_activations SET name = 'Deleted User', email = 'deleted@redacted.invalid', phone = '' WHERE user_id = $1`, [uid]);
+      await this.pool.query(`UPDATE event_contacts SET contact = 'Removed', email = 'deleted@redacted.invalid' WHERE owner_id = $1`, [uid]);
+      await this.pool.query(`DELETE FROM email_unsubscribes WHERE email = $1`, [cleanEmail]);
+      await this.pool.query(`DELETE FROM users WHERE id = $1`, [uid]);
+    } else {
+      this.fallbackData.users = this.fallbackData.users.filter(u => String(u.id) !== uid);
+      this.fallbackData.notifications = (this.fallbackData.notifications || []).filter(n => String(n.userId) !== uid);
+      this.fallbackData.user_badges = (this.fallbackData.user_badges || []).filter(b => String(b.userId) !== uid);
+      this.fallbackData.terms_acceptances = (this.fallbackData.terms_acceptances || []).filter(t => String(t.userId) !== uid);
+      this.fallbackData.blood_donor_profiles = (this.fallbackData.blood_donor_profiles || []).filter(d => String(d.userId) !== uid);
+      this.fallbackData.volunteer_applications = (this.fallbackData.volunteer_applications || []).map(v =>
+        String(v.userId) === uid
+          ? { ...v, userId: null, applicantName: 'Deleted User', applicantPhone: null, applicantEmail: null, trackingLat: null, trackingLng: null }
+          : v
+      );
+      this.fallbackData.website_inquiries = (this.fallbackData.website_inquiries || []).map(i =>
+        String(i.userId) === uid ? { ...i, userId: null, name: 'Deleted User', email: 'deleted@redacted.invalid', phone: '' } : i
+      );
+      this.fallbackData.email_unsubscribes = (this.fallbackData.email_unsubscribes || []).filter(r => r.email !== cleanEmail);
+      this.saveFallback();
+    }
+
+    const receipt = await this.createDataDeletionRequest({
+      userId: null,
+      email: 'redacted',
+      requestType: 'account_erasure',
+      reason,
+      status: 'completed'
+    });
+    return { deleted: true, receiptId: receipt.id };
   }
 }
 

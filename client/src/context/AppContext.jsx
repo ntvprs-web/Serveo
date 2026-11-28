@@ -69,6 +69,32 @@ export function AppProvider({ children }) {
     return localStorage.getItem('serveo_terms_version') === SERVEO_TERMS_VERSION;
   });
 
+  const [cookieConsent, setCookieConsent] = useState(() => {
+    try {
+      const raw = localStorage.getItem('serveo_cookie_consent');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [cookieBannerOpen, setCookieBannerOpen] = useState(false);
+
+  const saveCookieConsent = useCallback((prefs) => {
+    const next = {
+      essential: true,
+      functional: Boolean(prefs?.functional),
+      updatedAt: new Date().toISOString()
+    };
+    localStorage.setItem('serveo_cookie_consent', JSON.stringify(next));
+    if (!next.functional) {
+      localStorage.removeItem('serveo_location');
+      localStorage.removeItem('serveo_saved_events');
+    }
+    setCookieConsent(next);
+    setCookieBannerOpen(false);
+    addToast(next.functional ? 'Cookie preferences saved (All enabled).' : 'Cookie preferences saved (Essential only).');
+  }, [addToast]);
+
   const toastTimerRef = useRef({});
   const knownNotifIdsRef = useRef(null);
 
@@ -118,13 +144,8 @@ export function AppProvider({ children }) {
         paymentReference: details.paymentReference || ''
       })
     });
-    localStorage.setItem('serveo_premium_customer', JSON.stringify({
-      name: details.name,
-      email: details.email,
-      phone: details.phone,
-      organizationName: details.organizationName || '',
-      plan: details.plan || 'monthly'
-    }));
+    // Data minimization: remove any legacy client-side PII cache and store only active flag
+    localStorage.removeItem('serveo_premium_customer');
     localStorage.setItem('serveo_premium_status', 'active');
     setIsPremium(true);
     addToast('SERVEO Premium activated & verified! 25 km–100 km alerts & verified perks unlocked.');
@@ -144,11 +165,13 @@ export function AppProvider({ children }) {
     setSavedIds(prev => {
       const exists = prev.includes(strId);
       const next = exists ? prev.filter(id => id !== strId) : [...prev, strId];
-      localStorage.setItem('serveo_saved_events', JSON.stringify(next));
+      if (!cookieConsent || cookieConsent.functional) {
+        localStorage.setItem('serveo_saved_events', JSON.stringify(next));
+      }
       addToast(exists ? 'Removed from saved events' : 'Saved event to your list');
       return next;
     });
-  }, [addToast]);
+  }, [addToast, cookieConsent]);
 
   const refreshMe = useCallback(async () => {
     try {
@@ -240,7 +263,9 @@ export function AppProvider({ children }) {
           label: 'Near You'
         };
         setUserLocation(loc);
-        localStorage.setItem('serveo_location', JSON.stringify(loc));
+        if (!cookieConsent || cookieConsent.functional) {
+          localStorage.setItem('serveo_location', JSON.stringify(loc));
+        }
         addToast(`Location updated — showing nearby alerts within ${alertRadiusKm} km!`);
         if (user) {
           apiFetch('/api/auth/location', {
@@ -485,7 +510,11 @@ export function AppProvider({ children }) {
     buyBadge,
     toggleEquipBadge,
     termsAccepted,
-    acceptTerms
+    acceptTerms,
+    cookieConsent,
+    cookieBannerOpen,
+    setCookieBannerOpen,
+    saveCookieConsent
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -32,7 +32,17 @@ export default function EventDetailPage() {
   const [showVolunteerModal, setShowVolunteerModal] = useState(false);
   const [volRole, setVolRole] = useState('On-site Volunteer');
   const [volNotes, setVolNotes] = useState('');
+  const [volAgeConsent, setVolAgeConsent] = useState(true);
   const [joining, setJoining] = useState(false);
+
+  useEffect(() => {
+    if (!showVolunteerModal) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowVolunteerModal(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showVolunteerModal]);
 
   // Review / False-alarm state
   const [reviewOutcome, setReviewOutcome] = useState('helpful');
@@ -195,7 +205,7 @@ export default function EventDetailPage() {
       {/* Main Detail Card (Ref 2 layout) */}
       <div className="card" style={{ padding: 20 }}>
         <div style={{ borderRadius: 20, overflow: 'hidden', height: 240, marginBottom: 18, background: cat.pastelBg }}>
-          <img src={cat.image} alt={event.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={cat.image} alt={`${event.title} — ${cat.label} community event`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
@@ -432,14 +442,17 @@ export default function EventDetailPage() {
           }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rsvp-modal-title"
             className="card"
             onClick={(e) => e.stopPropagation()}
             style={{ width: '100%', maxWidth: 440, padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}
           >
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>Join "{event.title}"</h3>
+            <h3 id="rsvp-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>Join &ldquo;{event.title}&rdquo;</h3>
             <div>
-              <label className="form-label">Preferred Role</label>
-              <select className="select-field" value={volRole} onChange={(e) => setVolRole(e.target.value)}>
+              <label htmlFor="rsvp-role" className="form-label">Preferred Role</label>
+              <select id="rsvp-role" className="select-field" value={volRole} onChange={(e) => setVolRole(e.target.value)}>
                 <option value="On-site Volunteer">On-site Volunteer</option>
                 <option value="Registration & Crowd Desk">Registration & Crowd Desk</option>
                 <option value="Logistics & Supplies">Logistics & Supplies</option>
@@ -447,8 +460,9 @@ export default function EventDetailPage() {
               </select>
             </div>
             <div>
-              <label className="form-label">Notes (Optional)</label>
+              <label htmlFor="rsvp-notes" className="form-label">Notes (Optional)</label>
               <textarea
+                id="rsvp-notes"
                 className="textarea-field"
                 rows={3}
                 placeholder="Any skills, availability window, or vehicle support..."
@@ -456,13 +470,22 @@ export default function EventDetailPage() {
                 onChange={(e) => setVolNotes(e.target.value)}
               />
             </div>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.78rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={volAgeConsent}
+                onChange={(e) => setVolAgeConsent(e.target.checked)}
+                style={{ marginTop: 2 }}
+              />
+              <span>I confirm I am 18+ or participating with parent/legal guardian consent.</span>
+            </label>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button type="button" onClick={() => setShowVolunteerModal(false)} className="pill-btn">
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={joining}
+                disabled={joining || !volAgeConsent}
                 onClick={handleQuickJoin}
                 className="pill-btn pill-btn-gold"
               >

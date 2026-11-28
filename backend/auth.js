@@ -229,12 +229,42 @@ function authenticateRequired(req, res, next) {
   return next();
 }
 
-async function sendEmailOtp(email) {
+function createUnsubscribeToken(email) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const payload = Buffer.from(cleanEmail, 'utf8').toString('base64url');
+  const sig = crypto.createHmac('sha256', JWT_SECRET).update(`unsub:${cleanEmail}`).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+function verifyUnsubscribeToken(token) {
+  const raw = String(token || '').trim();
+  const dot = raw.indexOf('.');
+  if (dot <= 0) return null;
+  const payload = raw.slice(0, dot);
+  const sig = raw.slice(dot + 1);
+  try {
+    const cleanEmail = Buffer.from(payload, 'base64url').toString('utf8').trim().toLowerCase();
+    if (!isValidEmail(cleanEmail)) return null;
+    const expected = crypto.createHmac('sha256', JWT_SECRET).update(`unsub:${cleanEmail}`).digest('base64url');
+    const a = Buffer.from(sig);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+    return cleanEmail;
+  } catch {
+    return null;
+  }
+}
+
+async function sendEmailOtp(email, siteOrigin = '') {
   const cleanEmail = String(email || '').trim().toLowerCase();
   const code = issueOtp(emailOtpStore, cleanEmail, 'EMAIL');
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
     const resend = new Resend(resendKey);
+    const baseUrl = String(siteOrigin || process.env.SITE_URL || 'http://localhost:3002').replace(/\/+$/, '');
+    const unsubToken = createUnsubscribeToken(cleanEmail);
+    const unsubscribeUrl = `${baseUrl}/unsubscribe?token=${encodeURIComponent(unsubToken)}`;
+    const businessLine = process.env.SERVEO_BUSINESS_ADDRESS || 'SERVEO Community Initiative · ABESIT Campus, Ghaziabad, UP 201009, India';
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 28px 18px; background: #f8fafc;">
         <div style="background: #ffffff; padding: 32px 28px; border-radius: 18px; border: 1px solid #e2e8f0; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
@@ -253,8 +283,12 @@ async function sendEmailOtp(email) {
           <p style="font-size: 13px; line-height: 1.5; color: #475569; margin: 0 0 10px;">
             This code is valid for <strong>10 minutes</strong> and can only be used once.
           </p>
-          <p style="font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0; padding-top: 14px; border-top: 1px solid #f1f5f9;">
+          <p style="font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 0 0 14px; padding-top: 14px; border-top: 1px solid #f1f5f9;">
             For your security, never share this OTP with anyone. If you did not request verification on SERVEO, you can safely ignore this email.
+          </p>
+          <p style="font-size: 11px; line-height: 1.5; color: #64748b; margin: 0;">
+            ${businessLine}<br/>
+            Don't want alert or community emails? <a href="${unsubscribeUrl}" style="color: #0f172a; text-decoration: underline;">Unsubscribe from non-essential emails</a>.
           </p>
         </div>
       </div>
@@ -264,8 +298,12 @@ async function sendEmailOtp(email) {
       from: process.env.EMAIL_FROM || 'SERVEO Community <onboarding@resend.dev>',
       to: [cleanEmail],
       subject: `${code} is your SERVEO verification code`,
+      headers: {
+        'List-Unsubscribe': `<${unsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+      },
       html,
-      text: `Your SERVEO 6-digit email verification code is ${code}. It expires in 10 minutes.`
+      text: `Your SERVEO 6-digit email verification code is ${code}. It expires in 10 minutes.\n\n${businessLine}\nUnsubscribe from non-essential emails: ${unsubscribeUrl}`
     });
 
     if (error) {
@@ -316,6 +354,8 @@ module.exports = {
   verifyTwilioOtp,
   sendEmailOtp,
   verifyEmailOtp,
+  createUnsubscribeToken,
+  verifyUnsubscribeToken,
   isEmailPreVerified,
   consumeEmailVerification,
   isPhonePreVerified,

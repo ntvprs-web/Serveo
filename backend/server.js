@@ -22,6 +22,8 @@ const {
   verifyTwilioOtp,
   sendEmailOtp,
   verifyEmailOtp,
+  createUnsubscribeToken,
+  verifyUnsubscribeToken,
   isEmailPreVerified,
   consumeEmailVerification,
   isPhonePreVerified,
@@ -189,7 +191,9 @@ app.post('/api/auth/signup', async (req, res) => {
       notificationLng,
       bloodGroup,
       role = 'volunteer',
-      organizationType
+      organizationType,
+      ageConsentType = 'adult_18_plus',
+      guardianName = ''
     } = req.body;
 
     if (!name || !username || !rawEmail || !rawPhone || !password) {
@@ -209,6 +213,13 @@ app.post('/api/auth/signup', async (req, res) => {
 
     if (password.length < 6) {
       return res.status(400).json({ error: 'WEAK_PASSWORD', message: 'Password must be at least 6 characters.' });
+    }
+
+    if (!['adult_18_plus', 'minor_with_guardian_consent'].includes(ageConsentType)) {
+      return res.status(400).json({ error: 'AGE_CONSENT_REQUIRED', message: 'Please confirm your age eligibility (18+ or verifiable parental consent).' });
+    }
+    if (ageConsentType === 'minor_with_guardian_consent' && String(guardianName || '').trim().length < 2) {
+      return res.status(400).json({ error: 'GUARDIAN_CONSENT_REQUIRED', message: 'Parent or legal guardian full name is required for users under 18 (DPDP Act, 2023).' });
     }
 
     // Verify Mobile OTP (or accept pre-verified from /api/auth/otp/verify)
@@ -259,7 +270,9 @@ app.post('/api/auth/signup', async (req, res) => {
       notificationLat,
       notificationLng,
       bloodGroup: resolvedOrgType ? null : (bloodGroup || null),
-      organizationType: resolvedOrgType
+      organizationType: resolvedOrgType,
+      ageConsentType,
+      guardianName: ageConsentType === 'minor_with_guardian_consent' ? String(guardianName).trim() : null
     });
 
     const token = generateToken(user);
@@ -374,7 +387,8 @@ app.post('/api/auth/email-otp/send', async (req, res) => {
         message: 'Please provide a valid email address (e.g., name@domain.com).'
       });
     }
-    const result = await sendEmailOtp(email);
+    const origin = getSiteOrigin(req) || '';
+    const result = await sendEmailOtp(email, origin);
     res.json({
       success: true,
       email,
@@ -728,9 +742,101 @@ app.get('/api/auth/me', async (req, res) => {
 app.get('/api/legal/contact', (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({
-    supportEmail: process.env.SERVEO_SUPPORT_EMAIL || '',
-    privacyEmail: process.env.SERVEO_PRIVACY_EMAIL || ''
+    businessName: process.env.SERVEO_BUSINESS_NAME || 'SERVEO Community Initiative',
+    operatorName: process.env.SERVEO_OPERATOR_NAME || 'Nivesh Kumar Tyagi (Team Lead)',
+    address: process.env.SERVEO_BUSINESS_ADDRESS || 'ABES Institute of Technology Campus, NH-24, Ghaziabad, Uttar Pradesh 201009, India',
+    supportEmail: process.env.SERVEO_SUPPORT_EMAIL || 'ntvprs@gmail.com',
+    privacyEmail: process.env.SERVEO_PRIVACY_EMAIL || 'ntvprs@gmail.com',
+    grievanceOfficer: process.env.SERVEO_GRIEVANCE_OFFICER || 'Nivesh Kumar Tyagi — Grievance & Data Protection Contact',
+    jurisdiction: 'Ghaziabad, Uttar Pradesh, India'
   });
+});
+
+// Email Unsubscribe (One-Click RFC 8058 + Token / Authenticated / Email form)
+app.get('/api/email/unsubscribe', (req, res) => {
+  const token = String(req.query.token || '').trim();
+  const email = verifyUnsubscribeToken(token);
+  if (!email) {
+    return res.status(400).json({ valid: false, message: 'Invalid or missing unsubscribe token.' });
+  }
+  return res.json({ valid: true, email });
+});
+
+app.post('/api/email/unsubscribe', async (req, res) => {
+  try {
+    const token = String(req.body?.token || '').trim();
+    const rawEmail = String(req.body?.email || '').trim().toLowerCase();
+    const reason = String(req.body?.reason || 'user_request').trim();
+
+    let targetEmail = null;
+    if (token) {
+      targetEmail = verifyUnsubscribeToken(token);
+      if (!targetEmail) {
+        return res.status(400).json({ error: 'INVALID_UNSUBSCRIBE_TOKEN', message: 'Invalid unsubscribe link.' });
+      }
+    } else if (req.user?.email) {
+      targetEmail = String(req.user.email).trim().toLowerCase();
+    } else if (isValidEmail(rawEmail)) {
+      targetEmail = rawEmail;
+    }
+
+    if (!targetEmail) {
+      return res.status(400).json({ error: 'EMAIL_REQUIRED', message: 'Please provide a valid email address or unsubscribe token.' });
+    }
+
+    const result = await db.unsubscribeEmail(targetEmail, reason);
+    return res.json({
+      success: true,
+      email: result.email,
+      message: `Unsubscribed ${result.email} from non-essential SERVEO emails and event alerts. Essential security OTPs still require explicit user request.`
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'UNSUBSCRIBE_FAILED', message: err.message });
+  }
+});
+
+// DPDP Act 2023 Right to Erasure / Account & Data Deletion Request
+app.post('/api/privacy/data-deletion-request', async (req, res) => {
+  try {
+    const { email = '', reason = '', confirm = '' } = req.body || {};
+
+    if (req.user) {
+      if (String(confirm).trim().toUpperCase() !== 'DELETE') {
+        return res.status(400).json({
+          error: 'CONFIRMATION_REQUIRED',
+          message: 'Type DELETE to permanently erase your SERVEO account and personal data.'
+        });
+      }
+      const result = await db.deleteUserAndData(req.user.id, reason || 'self_service_erasure');
+      clearAuthCookie(res);
+      return res.json({
+        success: true,
+        status: 'completed',
+        receiptId: result?.receiptId || null,
+        message: 'Your SERVEO account and personal data have been permanently deleted / anonymized.'
+      });
+    }
+
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!isValidEmail(cleanEmail)) {
+      return res.status(400).json({ error: 'INVALID_EMAIL', message: 'Please enter a valid email address for your data deletion request.' });
+    }
+    const ticket = await db.createDataDeletionRequest({
+      userId: null,
+      email: cleanEmail,
+      requestType: 'guest_erasure_request',
+      reason: String(reason || '').trim(),
+      status: 'pending'
+    });
+    return res.status(201).json({
+      success: true,
+      status: 'pending',
+      receiptId: ticket.id,
+      message: 'Your data deletion request has been logged. Our Grievance Officer will verify and process it within 72 hours (DPDP Act, 2023).'
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'DELETION_REQUEST_FAILED', message: err.message });
+  }
 });
 
 app.get('/api/terms/status', async (req, res) => {
@@ -1933,8 +2039,12 @@ const seoPages = {
   'blood-donation.html': { path: '/blood-donation', title: 'Blood Donation Center | SERVEO', description: 'Check donation eligibility, find verified blood bank stock needs, and track confirmed donations.' },
   'food-donation.html': { path: '/food-donation', title: 'Surplus Food Pickups | SERVEO', description: 'Share surplus food safely with nearby verified community organizations.' }
   ,'my-hours.html': { path: '/my-hours', title: 'My Volunteer Hours | SERVEO', description: 'View your organizer-verified volunteer hours and download a verifiable record.' }
+  ,'refund-policy.html': { path: '/refund-policy', title: 'Refund & Cancellation Policy | SERVEO', description: 'Read SERVEO refund and cancellation terms for verified organizer badges, Premium plans, and direct donations.' }
+  ,'cookies.html': { path: '/cookies', title: 'Cookie & Local Storage Policy | SERVEO', description: 'Learn how SERVEO uses essential authentication cookies, local storage preferences, and third-party services.' }
+  ,'licenses.html': { path: '/licenses', title: 'Fonts, Images & Open-Source Licenses | SERVEO', description: 'View font licenses, stock image attributions, and third-party SDK disclosures for SERVEO.' }
+  ,'unsubscribe.html': { path: '/unsubscribe', title: 'Email Unsubscribe & Preferences | SERVEO', description: 'Manage or unsubscribe from non-essential SERVEO notification emails.' }
 };
-const noIndexPages = new Set(['login.html', 'organizer.html', 'post-event.html', 'premium.html', 'seed.html', 'event-detail.html', 'my-hours.html']);
+const noIndexPages = new Set(['login.html', 'organizer.html', 'post-event.html', 'premium.html', 'seed.html', 'event-detail.html', 'my-hours.html', 'unsubscribe.html']);
 const configuredSiteUrl = process.env.SITE_URL || (process.env.ALLOWED_ORIGINS || '')
   .split(',').map(value => value.trim()).find(value => /^https?:\/\//i.test(value));
 let seoSiteOrigin = '';
@@ -2128,7 +2238,7 @@ app.get(/^\/(index|events|about|impact|map|urgent-blood|blood-donation|food-dona
 app.use(express.static(frontendPath, { index: false }));
 
 // Clean URLs & friendly route aliases
-const htmlRoutes = ['map', 'events', 'event-detail', 'events-detail', 'event', 'post-event', 'organizer', 'organization', 'dashboard', 'impact', 'my-hours', 'about', 'seed', 'login', 'premium', 'terms', 'privacy', 'urgent-blood', 'blood-donation', 'food-donation', 'badges'];
+const htmlRoutes = ['map', 'events', 'event-detail', 'events-detail', 'event', 'post-event', 'organizer', 'organization', 'dashboard', 'impact', 'my-hours', 'about', 'seed', 'login', 'premium', 'terms', 'privacy', 'refund-policy', 'cookies', 'cookie-policy', 'licenses', 'unsubscribe', 'urgent-blood', 'blood-donation', 'food-donation', 'badges'];
 htmlRoutes.forEach(r => {
   app.get(`/${r}`, (req, res) => {
     if (['event', 'events-detail'].includes(r)) {
@@ -2199,14 +2309,18 @@ async function start() {
   try { await db.processUrgentBloodWaves(); } catch (error) { console.error('Initial blood match wave failed:', error.message); }
   const bloodWaveTimer = setInterval(() => db.processUrgentBloodWaves().catch(error => console.error('Blood match wave failed:', error.message)), 5 * 60 * 1000);
   bloodWaveTimer.unref?.();
-  const host = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
-  app.listen(PORT, host, () => {
+  const onListen = () => {
     console.log(`\n======================================================`);
     console.log(`🌍 SERVEO Platform Backend running at http://localhost:${PORT}`);
     console.log(`📡 Real-Time SSE Stream live at /api/events/stream`);
     console.log(`📦 Database Mode: ${db.mode.toUpperCase()}`);
     console.log(`======================================================\n`);
-  });
+  };
+  if (process.env.HOST) {
+    app.listen(PORT, process.env.HOST, onListen);
+  } else {
+    app.listen(PORT, onListen);
+  }
 }
 
 if (require.main === module) start().catch(err => {

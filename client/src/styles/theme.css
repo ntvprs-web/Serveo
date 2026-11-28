@@ -733,3 +733,65 @@ img {
     transition: none;
   }
 }
+
+/* ==========================================================================
+   Accessibility: Keyboard Focus & Skip Navigation + Legal Footer
+   ========================================================================== */
+:focus-visible {
+  outline: 3px solid var(--accent-coral);
+  outline-offset: 2px;
+}
+
+.skip-to-content {
+  position: fixed;
+  left: -9999px;
+  top: 12px;
+  z-index: 9999;
+  padding: 10px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-charcoal);
+  color: var(--text-inverse);
+  font-size: 0.86rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-lg);
+}
+
+.skip-to-content:focus {
+  left: 14px;
+}
+
+.app-footer {
+  width: 100%;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  margin-top: 28px;
+}
+
+.app-footer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px !important;
+  padding-bottom: 18px !important;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.app-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+}
+
+.app-footer-links a,
+.app-footer-links button {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.78rem;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

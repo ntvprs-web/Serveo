@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Mail,
   Phone,
@@ -36,6 +36,9 @@ export default function LoginPage() {
   const [signupPassword, setSignupPassword] = useState('');
   const [bloodGroup, setBloodGroup] = useState('');
   const [organizationType, setOrganizationType] = useState('ngo');
+  const [ageConsentType, setAgeConsentType] = useState('adult_18_plus');
+  const [guardianName, setGuardianName] = useState('');
+  const [guardianConsentChecked, setGuardianConsentChecked] = useState(false);
 
   // Email OTP state (Step 1) — via Resend backend
   const [email, setEmail] = useState('');
@@ -209,6 +212,10 @@ export default function LoginPage() {
       setErrorMsg('Please complete your name, username, and password (min 6 characters).');
       return;
     }
+    if (ageConsentType === 'minor_with_guardian_consent' && (guardianName.trim().length < 2 || !guardianConsentChecked)) {
+      setErrorMsg('Parent / Legal Guardian name and consent confirmation are required for users under 18 (DPDP Act, 2023).');
+      return;
+    }
     try {
       setBusy(true);
       const res = await apiFetch('/api/auth/signup', {
@@ -218,15 +225,14 @@ export default function LoginPage() {
           username: username.trim(),
           email: email.trim().toLowerCase(),
           phone: `+91${phoneDigits}`,
-          // Both OTPs were already verified — send dummy codes so the backend
-          // recognises verification (the stores are consumed, so we pass the
-          // flag that verification happened client-side).
           code: '000000',
           emailCode: '000000',
           password: signupPassword,
           role,
           organizationType: role === 'organizer' ? organizationType : null,
-          bloodGroup: role === 'volunteer' ? (bloodGroup || null) : null
+          bloodGroup: role === 'volunteer' ? (bloodGroup || null) : null,
+          ageConsentType,
+          guardianName: ageConsentType === 'minor_with_guardian_consent' ? guardianName.trim() : null
         })
       });
       setUser(res.user);
@@ -588,6 +594,62 @@ export default function LoginPage() {
                 </div>
               )}
             </div>
+
+            {/* Age & Verifiable Parental Consent (DPDP Act, 2023) */}
+            <fieldset style={{ padding: 14, borderRadius: 16, background: 'var(--bg-surface-muted)', border: '1px solid var(--border-subtle)', margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <legend style={{ fontWeight: 700, fontSize: '0.84rem', padding: '0 4px' }}>
+                3. Age &amp; Consent Confirmation (DPDP Act, 2023)
+              </legend>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="ageConsentType"
+                  value="adult_18_plus"
+                  checked={ageConsentType === 'adult_18_plus'}
+                  onChange={() => setAgeConsentType('adult_18_plus')}
+                />
+                <span>I confirm I am <strong>18 years of age or older</strong>.</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="ageConsentType"
+                  value="minor_with_guardian_consent"
+                  checked={ageConsentType === 'minor_with_guardian_consent'}
+                  onChange={() => setAgeConsentType('minor_with_guardian_consent')}
+                />
+                <span>I am <strong>under 18</strong> and registering with Parent / Legal Guardian consent.</span>
+              </label>
+
+              {ageConsentType === 'minor_with_guardian_consent' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
+                  <div>
+                    <label htmlFor="guardian-name" className="form-label">Parent / Legal Guardian Full Name</label>
+                    <input
+                      id="guardian-name"
+                      required
+                      className="input-field"
+                      placeholder="Full name of Parent or Guardian"
+                      value={guardianName}
+                      onChange={(e) => setGuardianName(e.target.value)}
+                    />
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.78rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      required
+                      checked={guardianConsentChecked}
+                      onChange={(e) => setGuardianConsentChecked(e.target.checked)}
+                      style={{ marginTop: 2 }}
+                    />
+                    <span>
+                      I confirm my parent/legal guardian has reviewed the{' '}
+                      <Link to="/privacy" style={{ textDecoration: 'underline', fontWeight: 600 }}>Privacy Policy</Link> and consents to processing minimal account data for volunteer participation.
+                    </span>
+                  </label>
+                </div>
+              )}
+            </fieldset>
 
             <button
               type="submit"

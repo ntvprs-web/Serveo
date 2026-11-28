@@ -17,7 +17,7 @@ import MyHoursPage from './pages/MyHoursPage';
 import BadgesShopPage from './pages/BadgesShopPage';
 import ImpactPage from './pages/ImpactPage';
 import PremiumPage from './pages/PremiumPage';
-import { AboutPage, LegalPage } from './pages/StaticInfoPages';
+import { AboutPage, LegalPage, UnsubscribePage } from './pages/StaticInfoPages';
 
 export default function App() {
   return (
@@ -65,6 +65,11 @@ export default function App() {
             <Route path="/terms.html" element={<Navigate to="/terms" replace />} />
             <Route path="/privacy" element={<LegalPage type="privacy" />} />
             <Route path="/privacy.html" element={<Navigate to="/privacy" replace />} />
+            <Route path="/refund-policy" element={<LegalPage type="refund" />} />
+            <Route path="/cookies" element={<LegalPage type="cookies" />} />
+            <Route path="/cookie-policy" element={<Navigate to="/cookies" replace />} />
+            <Route path="/licenses" element={<LegalPage type="licenses" />} />
+            <Route path="/unsubscribe" element={<UnsubscribePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AppShell>
