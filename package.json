@@ -13,8 +13,11 @@
     "test": "node backend/test.js"
   },
   "dependencies": {
+    "@dataconnect/generated": "file:src/dataconnect-generated",
+    "firebase": "^12.19.0",
     "firebase-admin": "^14.5.1",
     "gsap": "3.13.0",
+    "instal": "^0.0.1-security",
     "lenis": "1.3.27"
   }
 }
