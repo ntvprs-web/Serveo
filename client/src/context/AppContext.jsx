@@ -79,6 +79,20 @@ export function AppProvider({ children }) {
   });
   const [cookieBannerOpen, setCookieBannerOpen] = useState(false);
 
+  const toastTimerRef = useRef({});
+  const knownNotifIdsRef = useRef(null);
+
+  const alertRadiusKm = isPremium ? 25 : 5;
+
+  const addToast = useCallback((message, duration = 4200) => {
+    const id = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    setToasts(prev => [...prev.slice(-3), { id, message }]);
+    toastTimerRef.current[id] = setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+      delete toastTimerRef.current[id];
+    }, duration);
+  }, []);
+
   const saveCookieConsent = useCallback((prefs) => {
     const next = {
       essential: true,
@@ -94,20 +108,6 @@ export function AppProvider({ children }) {
     setCookieBannerOpen(false);
     addToast(next.functional ? 'Cookie preferences saved (All enabled).' : 'Cookie preferences saved (Essential only).');
   }, [addToast]);
-
-  const toastTimerRef = useRef({});
-  const knownNotifIdsRef = useRef(null);
-
-  const alertRadiusKm = isPremium ? 25 : 5;
-
-  const addToast = useCallback((message, duration = 4200) => {
-    const id = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-    setToasts(prev => [...prev.slice(-3), { id, message }]);
-    toastTimerRef.current[id] = setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-      delete toastTimerRef.current[id];
-    }, duration);
-  }, []);
 
   const pushEmergencyAlert = useCallback((alertObj) => {
     const id = alertObj.alertId || 'em_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
